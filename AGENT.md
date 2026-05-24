@@ -17,7 +17,7 @@
 | # | 段階 | ユーザーがすること |
 |---|---|---|
 | 0 | URL を教える | Scanners Base の URL を AI に伝える |
-| 1 | **Dify の作成** | output 項目を決める → Dify DSL を保存して import → **公開** |
+| 1 | **Dify の作成** | output 項目を決める → **`dify.yml` を添付** → 編集版を import → **公開** |
 | 2 | **Rule の設定** | Dify で API キー発行 → SNB の Rule に設定（正規表現は AI がテーマから提案） |
 | 3 | **index.html / login.html の作成** | AI と対話して画面を決める → コードを保存 |
 | 4 | **開く** | 保存した `index.html` をブラウザで開く |
@@ -81,9 +81,9 @@ Rule 設定済みなら **UI のヒアリング**（段階3）へ。
 4. 次を提案する:
 
 > **Dify、お作りしましょうか？**  
-> この指示書（AGENT.md）にある Dify テンプレートをベースに、決めた読み取り項目に合わせたワークフローを用意できます。
+> このリポジトリの `dify.yml` を添付していただければ、決めた読み取り項目に合わせて編集します。
 
-5. ユーザーが **作ってほしい** と言ったら → 「Dify ワークフローの作成」に進む（下記）
+5. ユーザーが **作ってほしい** と言ったら → **「Dify ワークフローの作成」** に進む（下記）。**まず `dify.yml` の添付を求める**
 6. ユーザーが **自分で組む** と言ったら → 確定した JSON 形式だけ渡し、Dify 完成後に **「Dify 完成後の案内」** で API キー + Rule を同時案内
 7. ユーザーが「import した」「Rule 設定した」と返すまで待ってもよい。**Rule 完了後に UI へ**（先に UI を進めたいと言えば進めてよい）
 
@@ -108,9 +108,24 @@ Rule 設定済みなら **UI のヒアリング**（段階3）へ。
 
 ### Dify ワークフローの作成
 
-本書 **「Dify DSL テンプレート（全文）」** に汎用テンプレートを収録している。**output 周りだけ書き換える前提。** ユーザーが Dify を作りたいと言ったら、このテンプレートをベースにカスタマイズして出力する。
+テンプレート本体はリポジトリの **`dify.yml`**（AGENT.md には含めない。分量が大きいため **別ファイル**）。
 
-#### 書き換えてよい箇所（ここだけ。最小限に）
+ユーザーが Dify を作りたいと言ったら、**AGENT.md 内のテンプレートを参照したり出力したりしない。** 次の流れで進める。
+
+#### 1. dify.yml の添付を求める（必須・最初）
+
+output スキーマが確定したあと、カスタマイズに入る **前** に、必ず `dify.yml` の添付を求める。
+
+> **次にやること**  
+> このリポジトリの **`dify.yml` を添付**（または内容を貼り付け）してください。  
+> 添付いただいた内容をもとに、決めた読み取り項目に合わせて **編集してよい箇所だけ** 直した `dify.yml` をお返しします。
+
+**ユーザーが `dify.yml` を添付（または全文貼り付け）するまで、カスタマイズ版の YML を出力しない。**
+
+- リポジトリを AI に渡している場合でも、**明示的に `dify.yml` の添付を求める**（「AGENT.md を読んで」とは言わない）
+- 添付が来たら、その内容を **ベース** として扱う。勝手に別テンプレートを使わない
+
+#### 2. 書き換えてよい箇所（ここだけ。最小限に）
 
 | 箇所 | 内容 |
 |---|---|
@@ -121,511 +136,18 @@ Rule 設定済みなら **UI のヒアリング**（段階3）へ。
 | `contentを括る` ノードの `code` | 引数・`content` 辞書のキー（schema と一致させる） |
 | `contentを括る` ノードの `variables` | `structured_output` から取る項目名（キーと一致） |
 
-#### 書き換えてはいけない箇所
+#### 3. 書き換えてはいけない箇所
 
 - ノード ID、edges、グラフ構造全体
 - HTTP リクエスト、分岐、エラー処理のロジック
 - `dependencies`、プラグイン設定
 - 上記以外のノード・コード
 
-**YML はごちゃごちゃさせない。** 項目の追加・削除に必要な最小 diff だけ。テンプレートの構造を組み替えない。
+**YML はごちゃごちゃさせない。** 添付された `dify.yml` に対し、項目の追加・削除に必要な **最小 diff だけ** 編集して返す。テンプレートの構造を組み替えない。
 
-#### Dify DSL テンプレート（全文）
+#### 4. 出力とユーザーへの案内
 
-カスタマイズの **ベース** として使う。下記をそのまま複製し、上記「書き換えてよい箇所」だけ最小限変更する。
-
-```yaml
-app:
-  description: ''
-  icon: 🤖
-  icon_background: '#FFEAD5'
-  mode: workflow
-  name: SNB テンプレYML
-  use_icon_as_answer_icon: false
-dependencies:
-- current_identifier: null
-  type: marketplace
-  value:
-    marketplace_plugin_unique_identifier: langgenius/openai:0.3.8@592c8252795b5f75807de2d609a03196ed02596b409f7642b4a07548c7ff57ef
-    version: null
-kind: app
-version: 0.5.0
-workflow:
-  conversation_variables: []
-  environment_variables: []
-  features:
-    file_upload:
-      allowed_file_extensions:
-      - .JPG
-      - .JPEG
-      - .PNG
-      - .GIF
-      - .WEBP
-      - .SVG
-      allowed_file_types:
-      - image
-      allowed_file_upload_methods:
-      - local_file
-      - remote_url
-      enabled: false
-      fileUploadConfig:
-        attachment_image_file_size_limit: 2
-        audio_file_size_limit: 50
-        batch_count_limit: 5
-        file_size_limit: 15
-        file_upload_limit: 20
-        image_file_batch_limit: 10
-        image_file_size_limit: 10
-        single_chunk_attachment_limit: 10
-        video_file_size_limit: 100
-        workflow_file_upload_limit: 10
-      image:
-        enabled: false
-        number_limits: 3
-        transfer_methods:
-        - local_file
-        - remote_url
-      number_limits: 3
-    opening_statement: ''
-    retriever_resource:
-      enabled: true
-    sensitive_word_avoidance:
-      enabled: false
-    speech_to_text:
-      enabled: false
-    suggested_questions: []
-    suggested_questions_after_answer:
-      enabled: false
-    text_to_speech:
-      enabled: false
-      language: ''
-      voice: ''
-  graph:
-    edges:
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: code
-        targetType: code
-      id: 1779208306569-source-1779348611854-target
-      selected: false
-      source: '1779208306569'
-      sourceHandle: source
-      target: '1779348611854'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: code
-        targetType: end
-      id: 1779348611854-source-1778727325919-target
-      selected: false
-      source: '1779348611854'
-      sourceHandle: source
-      target: '1778727325919'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: start
-        targetType: http-request
-      id: 1778727295551-source-1778727311635-target
-      selected: false
-      source: '1778727295551'
-      sourceHandle: source
-      target: '1778727311635'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: code
-        targetType: end
-      id: 17793515996460-source-1779351623030-target
-      selected: false
-      source: '17793515996460'
-      sourceHandle: source
-      target: '1779351623030'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: code
-        targetType: code
-      id: 17793515830970-source-17793515996460-target
-      selected: false
-      source: '17793515830970'
-      sourceHandle: source
-      target: '17793515996460'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: llm
-        targetType: code
-      id: 1778727304418-source-1779208306569-target
-      selected: false
-      source: '1778727304418'
-      sourceHandle: source
-      target: '1779208306569'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: llm
-        targetType: code
-      id: 1778727304418-fail-branch-17793515830970-target
-      selected: false
-      source: '1778727304418'
-      sourceHandle: fail-branch
-      target: '17793515830970'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: http-request
-        targetType: llm
-      id: 1778727311635-source-1778727304418-target
-      selected: false
-      source: '1778727311635'
-      sourceHandle: source
-      target: '1778727304418'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    nodes:
-    - data:
-        selected: false
-        title: ユーザー入力
-        type: start
-        variables:
-        - default: ''
-          hint: ''
-          label: image_url
-          options: []
-          placeholder: ''
-          required: true
-          type: text-input
-          variable: image_url
-      height: 109
-      id: '1778727295551'
-      position:
-        x: 0
-        y: 36
-      positionAbsolute:
-        x: 0
-        y: 36
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        context:
-          enabled: false
-          variable_selector: []
-        error_strategy: fail-branch
-        model:
-          completion_params: {}
-          mode: chat
-          name: gpt-4.1
-          provider: langgenius/openai/openai
-        prompt_template:
-        - id: 98712cf2-8844-4c1e-b4fa-5b6a419f4ab6
-          role: system
-          text: '# 役割
-
-            あなたは
-
-
-            # 指示
-
-            与えられるドキュメントのOCRを構造化出力に従って行って下さい。
-
-
-            # 注意
-
-            '
-        selected: false
-        structured_output:
-          schema:
-            additionalProperties: false
-            properties:
-              item1:
-                type: string
-              item2:
-                type: string
-            required:
-            - item1
-            - item2
-            type: object
-        structured_output_enabled: true
-        title: OCR
-        type: llm
-        vision:
-          configs:
-            detail: high
-            variable_selector:
-            - '1778727311635'
-            - files
-          enabled: true
-      height: 124
-      id: '1778727304418'
-      position:
-        x: 684
-        y: 29
-      positionAbsolute:
-        x: 684
-        y: 29
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        authorization:
-          config: null
-          type: no-auth
-        body:
-          data: []
-          type: none
-        headers: ''
-        method: get
-        params: ''
-        retry_config:
-          max_retries: 3
-          retry_enabled: false
-          retry_interval: 100
-        selected: false
-        ssl_verify: true
-        timeout:
-          max_connect_timeout: 0
-          max_read_timeout: 0
-          max_write_timeout: 0
-        title: 画像のGET
-        type: http-request
-        url: '{{#1778727295551.image_url#}}'
-        variables: []
-      height: 95
-      id: '1778727311635'
-      position:
-        x: 342
-        y: 43
-      positionAbsolute:
-        x: 342
-        y: 43
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        outputs:
-        - value_selector:
-          - '1779208306569'
-          - content
-          value_type: object
-          variable: content
-        - value_selector:
-          - '1779348611854'
-          - labels
-          value_type: object
-          variable: labels
-        - value_selector:
-          - '1779208306569'
-          - is_failed
-          value_type: boolean
-          variable: is_failed
-        selected: false
-        title: 出力
-        type: end
-      height: 140
-      id: '1778727325919'
-      position:
-        x: 1710
-        y: 0
-      positionAbsolute:
-        x: 1710
-        y: 0
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        code: "def main(item1: str, item2: str) -> dict:\n    items = [item1, item2]\n\
-          \    is_failed = any(item is None for item in items)\n\n    return {\n \
-          \       \"content\": {\n            \"item1\": item1,\n            \"item2\"\
-          : item2\n        },\n        \"is_failed\": is_failed,\n    }"
-        code_language: python3
-        outputs:
-          content:
-            children: null
-            type: object
-          is_failed:
-            children: null
-            type: boolean
-        selected: false
-        title: contentを括る
-        type: code
-        variables:
-        - value_selector:
-          - '1778727304418'
-          - structured_output
-          - item1
-          value_type: object
-          variable: item1
-        - value_selector:
-          - '1778727304418'
-          - structured_output
-          - item2
-          value_type: object
-          variable: item2
-      height: 52
-      id: '1779208306569'
-      position:
-        x: 1026
-        y: 44
-      positionAbsolute:
-        x: 1026
-        y: 44
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
-          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
-          \   }"
-        code_language: python3
-        outputs:
-          labels:
-            children: null
-            type: object
-        selected: false
-        title: labelsの割り当て
-        type: code
-        variables: []
-      height: 52
-      id: '1779348611854'
-      position:
-        x: 1368
-        y: 44
-      positionAbsolute:
-        x: 1368
-        y: 44
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        code: "def main() -> dict:\n    return {\n        \"content\": {\n       \
-          \     \"item1\": None,\n            \"item2\": None,\n        },\n     \
-          \   \"is_failed\": True,\n    }"
-        code_language: python3
-        outputs:
-          content:
-            children: null
-            type: object
-          is_failed:
-            children: null
-            type: boolean
-        selected: true
-        title: contentを括る
-        type: code
-        variables: []
-      height: 52
-      id: '17793515830970'
-      position:
-        x: 1046
-        y: 176
-      positionAbsolute:
-        x: 1046
-        y: 176
-      selected: true
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
-          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
-          \   }"
-        code_language: python3
-        outputs:
-          labels:
-            children: null
-            type: object
-        selected: false
-        title: labelsの割り当て
-        type: code
-        variables: []
-      height: 52
-      id: '17793515996460'
-      position:
-        x: 1388
-        y: 176
-      positionAbsolute:
-        x: 1388
-        y: 176
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        outputs:
-        - value_selector:
-          - '17793515996460'
-          - labels
-          value_type: object
-          variable: labels
-        - value_selector:
-          - '17793515830970'
-          - content
-          value_type: object
-          variable: content
-        - value_selector:
-          - '17793515830970'
-          - is_failed
-          value_type: boolean
-          variable: is_failed
-        selected: false
-        title: 出力
-        type: end
-      height: 140
-      id: '1779351623030'
-      position:
-        x: 1750
-        y: 220
-      positionAbsolute:
-        x: 1750
-        y: 220
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    viewport:
-      x: -89.67146560456251
-      y: 172.08420480147683
-      zoom: 1.0997773402620763
-  rag_pipeline_variables: []
-```
-
-#### 出力とユーザーへの案内
-
-1. テンプレートをベースにカスタマイズした **Dify DSL（YAML）全文** を出力する（ユーザーが保存するファイル名は `dify.yml`）
+1. 添付された `dify.yml` をベースに、上記 **書き換えてよい箇所だけ** 編集した **全文** を出力する
 2. **次の1ステップだけ** 案内する:
 
 > **次にやること**  
@@ -818,7 +340,7 @@ const EXTERNAL_API_KEY = "your-api-key-here";
 
 ## 出力ルール
 
-- 出力ファイルは通常 **`frontend/index.html`** と **`frontend/login.html`** の2つ。Dify 作成時はカスタマイズした **Dify DSL（YAML）** も出力可（テンプレートは AGENT.md 内）
+- 出力ファイルは通常 **`frontend/index.html`** と **`frontend/login.html`** の2つ。Dify 作成時は編集した **`dify.yml` 全文** も出力可（**ユーザー添付分をベース** に編集して返す）
 - 各ファイルは **単一 HTML ファイル**（外部 JS / CSS ファイルは作らない）
 - ビルドステップ不要（CDN の Tailwind / Font Awesome / Alpine.js を使う）
 - コードはコピーしてそのまま配置できる完全な HTML にする
@@ -1132,7 +654,9 @@ function normalizeOutput(output) {
 
 | # | 段階 | タイミング | ユーザーへの案内（例） |
 |---|---|---|---|
-| 1a | 1 Dify | output 確定後、Dify DSL を出力した直後 | 出力内容を `dify.yml` として保存し、Dify で **DSL インポート** する |
+| 1a | 1 Dify | 「Dify、お作りしましょうか？」で作ると返事があったら | リポジトリの **`dify.yml` を添付**（または全文貼り付け）してもらう |
+| 1a2 | 1 Dify | `dify.yml` の添付があったら | 添付内容をベースに **編集してよい箇所だけ** 直した `dify.yml` 全文を出力 |
+| 1a3 | 1 Dify | 編集版 YML を出力した直後 | 出力内容を `dify.yml` として保存し、Dify で **DSL インポート** する |
 | 1a2 | 1 Dify | import 完了の返事があったら | **Dify を公開しましたか？** … 未公開なら公開を案内 |
 | 1b | 1 Dify | 公開済みと確認できたら | **「Dify 完成後の案内」** … API キー発行 + Rule 設定（正規表現提案付き）を **1回で** 案内 |
 | 2 | 2 Rule | Rule 設定完了の返事があったら | 画面の作り方についてヒアリング開始（タイトル・機能など） |
@@ -1217,7 +741,7 @@ function normalizeOutput(output) {
 2. URL を確認し、`SNB_ORIGIN` として記憶する
 3. **段階1: Dify の作成**
    - **Dify 済み** → 構造化出力 JSON の丸投げを促す → `{ labels, content }` を検証
-   - **Dify 未設定** → output スキーマを対話で確定 → **「Dify、お作りしましょうか？」** → 要望があれば AGENT.md 内テンプレートを最小限書き換えて DSL を出力 → import を案内
+   - **Dify 未設定** → output スキーマを対話で確定 → **「Dify、お作りしましょうか？」** → **`dify.yml` の添付を求める** → 添付内容をベースに編集してよい箇所だけ直して返す → import を案内
 4. **段階2: Rule の設定**
    - Dify 完成後 → **「Dify 完成後の案内」** で API キー + Rule を同時案内（**正規表現はテーマから `^{theme}-.*$` を提案**）
    - Rule 設定完了まで **UI のヒアリングに進まない**（ユーザーが先に UI を進めたいと言えば進めてよい）
@@ -1247,7 +771,9 @@ function normalizeOutput(output) {
 - 用途カテゴリ（お客さん向け / 自分用など）を勝手に決めたり、ユーザーに聞いたりしない
 - **主な機能** の提案文に GET / PATCH / API / モーダル などエンジニア向けの言葉を使わない
 - できない要望を、**「それは機能的にできません」** と言わずに無理やり実装しない
-- Dify DSL テンプレートを **ごちゃごちゃ書き換えない**（output 周りの最小 diff のみ）
+- 添付された `dify.yml` を **ごちゃごちゃ書き換えない**（output 周りの最小 diff のみ）
+- AGENT.md 内に Dify テンプレートがあるかのように **参照しない**（テンプレートは **`dify.yml` 添付** がベース）
+- ユーザーが `dify.yml` を添付する前に、カスタマイズ版 YML を **出力しない**
 - コード出力後に **作業手順を一度に全部** 並べない（**次の1ステップだけ** 案内する）
 - 機能の合意後、デザインの意向が読み取れないのに **確認もせず** いきなりコードだけ出す（不足時は「デザインの確認」で念のため聞く）
 - クエリ貼り付け・ログイン後、**表示確認をせず** いきなりエンジニア共有や修正に進む

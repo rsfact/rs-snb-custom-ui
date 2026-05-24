@@ -28,7 +28,8 @@ SNB メイン画面（ボード）
 |---|---|
 | `frontend/index.html` | メイン画面（タスクの読み取り結果を表示） |
 | `frontend/login.html` | ログイン画面 |
-| `AGENT.md` | AI が読む設計書・API仕様・作業手順（**Dify DSL テンプレート含む**） |
+| `dify.yml` | Dify ワークフローのテンプレート（output 部分を書き換えて import 用。**AI に添付して編集依頼**） |
+| `AGENT.md` | AI が読む設計書・API仕様・作業手順 |
 | `README.md` | 人間向けの説明（このファイル） |
 
 ---
@@ -42,7 +43,7 @@ SNB メイン画面（ボード）
 | # | 段階 | 内容 |
 |---|---|---|
 | 0 | URL | Scanners Base の URL を AI に教える |
-| 1 | **Dify の作成** | 読み取り項目を決める → DSL を import → **公開** |
+| 1 | **Dify の作成** | 項目を決める → **`dify.yml` を AI に添付** → 編集版を保存して import → **公開** |
 | 2 | **Rule の設定** | Dify で API キー発行 → SNB の Rule に設定（正規表現は AI がテーマから提案） |
 | 3 | **HTML の作成** | 画面の要望を伝える → `index.html` / `login.html` を保存 |
 | 4 | **開く** | 保存した `index.html` をブラウザで開く |
@@ -61,7 +62,7 @@ SNB メイン画面（ボード）
 
 1. AI が **Dify 済みか** を確認する
 2. **Dify 済み** → 構造化出力 JSON をそのまま貼り付ける  
-   **Dify 未設定** → AI が `{ labels, content }` で項目案を提案 → **「Dify、お作りしましょうか？」** → 必要なら AGENT.md 内テンプレートを書き換えた DSL を出力 → `dify.yml` として保存 → Dify に **DSL インポート** → **公開**
+   **Dify 未設定** → AI が `{ labels, content }` で項目案を提案 → **「Dify、お作りしましょうか？」** → **`dify.yml` を AI に添付** → AI が編集してよい箇所だけ直して返す → 保存 → Dify に **DSL インポート** → **公開**
 
 ### 2. Rule の設定
 
