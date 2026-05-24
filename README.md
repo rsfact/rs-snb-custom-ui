@@ -27,6 +27,7 @@ SNB メイン画面（ボード）
 |---|---|
 | `frontend/index.html` | メイン画面（タスクの読み取り結果を表示） |
 | `frontend/login.html` | ログイン画面 |
+| `dify.yml` | Dify ワークフローのテンプレート（output 部分を書き換えて import 用） |
 | `AGENT.md` | AI が読む設計書・API仕様・作業手順 |
 | `README.md` | 人間向けの説明（このファイル） |
 
@@ -41,7 +42,7 @@ SNB メイン画面（ボード）
 1. この GitHub リポジトリを、普段お使いの AI に渡す
 2. AI が URL → **Dify 済みか** → output 構造の順に確認する
 3. **Dify 済み** → 構造化出力 JSON をそのまま貼り付ける  
-   **Dify 未設定** → AI が `{ labels, content }` で項目案を提案 → Dify 作成 + Rule 設定を案内 → できたら教える
+   **Dify 未設定** → AI が `{ labels, content }` で項目案を提案 → **「Dify、お作りしましょうか？」** と提案 → 必要なら `dify.yml` を書き換えて出力 → Dify に import
 4. output・Dify・Rule の準備が整ったら、「こんな画面が作りたい」と対話する
 5. AI が `index.html` と `login.html` を出力する（デザインの説明付き。**次にやること1つだけ** 案内される）
 
@@ -55,7 +56,7 @@ SNB メイン画面（ボード）
 ### 3. SNB で Rule・Task を作り、試しにアップロードする
 
 1. SNB にログインする
-2. **Dify** で読み取りワークフローを作成する（output は `{ labels, content }` 形式）
+2. **Dify** … AI が `dify.yml` を書き換えて渡す場合は、それを Dify に **import（DSL のインポート）** する。自分で組む場合も output は `{ labels, content }` 形式
 3. **Rule** を作成する。最低限、次を設定する:
    - **name**（Rule 名）
    - **Dify URL**

@@ -1,0 +1,486 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  name: SNB テンプレYML
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.3.8@592c8252795b5f75807de2d609a03196ed02596b409f7642b4a07548c7ff57ef
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1779208306569-source-1779348611854-target
+      selected: false
+      source: '1779208306569'
+      sourceHandle: source
+      target: '1779348611854'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1779348611854-source-1778727325919-target
+      selected: false
+      source: '1779348611854'
+      sourceHandle: source
+      target: '1778727325919'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: http-request
+      id: 1778727295551-source-1778727311635-target
+      selected: false
+      source: '1778727295551'
+      sourceHandle: source
+      target: '1778727311635'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 17793515996460-source-1779351623030-target
+      selected: false
+      source: '17793515996460'
+      sourceHandle: source
+      target: '1779351623030'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 17793515830970-source-17793515996460-target
+      selected: false
+      source: '17793515830970'
+      sourceHandle: source
+      target: '17793515996460'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1778727304418-source-1779208306569-target
+      selected: false
+      source: '1778727304418'
+      sourceHandle: source
+      target: '1779208306569'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1778727304418-fail-branch-17793515830970-target
+      selected: false
+      source: '1778727304418'
+      sourceHandle: fail-branch
+      target: '17793515830970'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: 1778727311635-source-1778727304418-target
+      selected: false
+      source: '1778727311635'
+      sourceHandle: source
+      target: '1778727304418'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: image_url
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: image_url
+      height: 109
+      id: '1778727295551'
+      position:
+        x: 0
+        y: 36
+      positionAbsolute:
+        x: 0
+        y: 36
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        error_strategy: fail-branch
+        model:
+          completion_params: {}
+          mode: chat
+          name: gpt-4.1
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 98712cf2-8844-4c1e-b4fa-5b6a419f4ab6
+          role: system
+          text: '# 役割
+
+            あなたは
+
+
+            # 指示
+
+            与えられるドキュメントのOCRを構造化出力に従って行って下さい。
+
+
+            # 注意
+
+            '
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              item1:
+                type: string
+              item2:
+                type: string
+            required:
+            - item1
+            - item2
+            type: object
+        structured_output_enabled: true
+        title: OCR
+        type: llm
+        vision:
+          configs:
+            detail: high
+            variable_selector:
+            - '1778727311635'
+            - files
+          enabled: true
+      height: 124
+      id: '1778727304418'
+      position:
+        x: 684
+        y: 29
+      positionAbsolute:
+        x: 684
+        y: 29
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: ''
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: false
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 画像のGET
+        type: http-request
+        url: '{{#1778727295551.image_url#}}'
+        variables: []
+      height: 95
+      id: '1778727311635'
+      position:
+        x: 342
+        y: 43
+      positionAbsolute:
+        x: 342
+        y: 43
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1779208306569'
+          - content
+          value_type: object
+          variable: content
+        - value_selector:
+          - '1779348611854'
+          - labels
+          value_type: object
+          variable: labels
+        - value_selector:
+          - '1779208306569'
+          - is_failed
+          value_type: boolean
+          variable: is_failed
+        selected: false
+        title: 出力
+        type: end
+      height: 140
+      id: '1778727325919'
+      position:
+        x: 1710
+        y: 0
+      positionAbsolute:
+        x: 1710
+        y: 0
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(item1: str, item2: str) -> dict:\n    items = [item1, item2]\n\
+          \    is_failed = any(item is None for item in items)\n\n    return {\n \
+          \       \"content\": {\n            \"item1\": item1,\n            \"item2\"\
+          : item2\n        },\n        \"is_failed\": is_failed,\n    }"
+        code_language: python3
+        outputs:
+          content:
+            children: null
+            type: object
+          is_failed:
+            children: null
+            type: boolean
+        selected: false
+        title: contentを括る
+        type: code
+        variables:
+        - value_selector:
+          - '1778727304418'
+          - structured_output
+          - item1
+          value_type: object
+          variable: item1
+        - value_selector:
+          - '1778727304418'
+          - structured_output
+          - item2
+          value_type: object
+          variable: item2
+      height: 52
+      id: '1779208306569'
+      position:
+        x: 1026
+        y: 44
+      positionAbsolute:
+        x: 1026
+        y: 44
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
+          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
+          \   }"
+        code_language: python3
+        outputs:
+          labels:
+            children: null
+            type: object
+        selected: false
+        title: labelsの割り当て
+        type: code
+        variables: []
+      height: 52
+      id: '1779348611854'
+      position:
+        x: 1368
+        y: 44
+      positionAbsolute:
+        x: 1368
+        y: 44
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"content\": {\n       \
+          \     \"item1\": None,\n            \"item2\": None,\n        },\n     \
+          \   \"is_failed\": True,\n    }"
+        code_language: python3
+        outputs:
+          content:
+            children: null
+            type: object
+          is_failed:
+            children: null
+            type: boolean
+        selected: true
+        title: contentを括る
+        type: code
+        variables: []
+      height: 52
+      id: '17793515830970'
+      position:
+        x: 1046
+        y: 176
+      positionAbsolute:
+        x: 1046
+        y: 176
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
+          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
+          \   }"
+        code_language: python3
+        outputs:
+          labels:
+            children: null
+            type: object
+        selected: false
+        title: labelsの割り当て
+        type: code
+        variables: []
+      height: 52
+      id: '17793515996460'
+      position:
+        x: 1388
+        y: 176
+      positionAbsolute:
+        x: 1388
+        y: 176
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '17793515996460'
+          - labels
+          value_type: object
+          variable: labels
+        - value_selector:
+          - '17793515830970'
+          - content
+          value_type: object
+          variable: content
+        - value_selector:
+          - '17793515830970'
+          - is_failed
+          value_type: boolean
+          variable: is_failed
+        selected: false
+        title: 出力
+        type: end
+      height: 140
+      id: '1779351623030'
+      position:
+        x: 1750
+        y: 220
+      positionAbsolute:
+        x: 1750
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -89.67146560456251
+      y: 172.08420480147683
+      zoom: 1.0997773402620763
+  rag_pipeline_variables: []
