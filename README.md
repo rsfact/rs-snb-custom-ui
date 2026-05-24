@@ -10,7 +10,8 @@ SNB 本体でアップロード・読み取りされたドキュメントを、*
 
 - SNB メイン画面（ボード）で Rule を作り、Task にドキュメントをアップロードする
 - 各 Task から、このリポジトリで作ったカスタム UI へ遷移する
-- user ロールの人は自分の Task だけ、admin はすべての Task を閲覧できる
+- user ロールの人は自分の Task だけ一覧できる。URL を知っていれば個別 Task は CRUD 可能
+- admin はすべての Task を一覧・操作できる
 
 ```
 SNB メイン画面（ボード）
@@ -38,12 +39,12 @@ SNB メイン画面（ボード）
 ### 1. AI と対話して HTML を作る
 
 1. この GitHub リポジトリを、普段お使いの AI に渡す
-2. AI が最初に **いまお使いのメインシステム（Scanners Base）の URL** を聞いてくるので、教える  
-   例: `https://your-company.example.com`（ブラウザのアドレスバーに表示されている URL）
-3. URL を伝えたあと、AI が **用途**（お客さんに見せる用か、ご自身のカスタムUIか）を聞いてくる
-4. 用途を伝えたあと、「こんな画面が作りたい」と対話する
-   - UI のタイトル、色、表示したい項目
-5. AI が `index.html` と `login.html` のコードを出力してくれる（`SNB_ORIGIN` には教えた URL が入っている）
+2. AI が最初に **メインシステム（Scanners Base）の URL** を聞いてくるので、教える
+3. 次に **読み取り結果（output）の項目が決まっているか** を聞かれる
+   - **決まっている** → 内容を伝え、**Dify を組んだか** も確認される
+   - **決まっていない** → AI が `{ labels, content }` 形式で項目案を提案する → **Dify を作成** するよう案内される
+4. output と Dify の準備が整ったら、「こんな画面が作りたい」と対話する
+5. AI が `index.html` と `login.html` を出力する
 
 ### 2. ローカルに貼り付ける
 
@@ -54,11 +55,12 @@ SNB メイン画面（ボード）
 
 ### 3. SNB で Rule・Task を作り、試しにアップロードする
 
-1. SNB に admin アカウントでログインする
-2. **Rule** を作成する（読み取りルール・output の形式を決める）
-3. **Task** を作成する
-4. 試し用のドキュメント（画像・PDF など）をアップロードする
-5. 読み取り結果（output）が返ってくるまで待つ
+1. SNB にログインする
+2. **Dify** で読み取りワークフローを作成する（output は `{ labels, content }` 形式）
+3. **Rule** を作成し、Dify URL と API キーを登録する
+4. **Task** を作成する
+5. 試し用のドキュメント（画像・PDF など）をアップロードする
+6. 読み取り結果（output）が想定どおり返ることを確認する
 
 ### 4. クエリをコピーして、ローカルで確認する
 
@@ -109,7 +111,7 @@ SNB メイン画面（ボード）
 
 - `SNB_ORIGIN` が SNB の URL と一致しているか確認する
 - クエリがアドレスバーに付いているか確認する
-- admin アカウントでログインしているか確認する（他人の Task を見る場合）
+- SNB と同じアカウントでログインしているか確認する
 
 ---
 
@@ -144,16 +146,18 @@ Task クリック時の遷移先:
 
 ## アクセス制御
 
-| 操作 | user ロール | admin ロール |
+**一覧の流出だけ防ぐ。admin が配布した URL から開けば、user も GET / PATCH / DELETE / POST できる。**
+
+| | user | admin |
 |---|---|---|
-| GET（タスク・画像の閲覧） | 自分のタスクのみ | すべて |
-| POST / PATCH / DELETE | 不可 | 可 |
+| 個別タスクの CRUD（URL で `board_id` + `task_id` 指定） | 可 | 可 |
+| タスク一覧・横断検索 | 自分の分のみ | 全件 |
 
 403 が返った場合、UI 側では「このURLからはご覧いただけません。」と表示します。
 
 ## デフォルトサンプル UI の動作
 
-`frontend/` に入っているのは **お客さんに見せる用** のプレーンなサンプル（GET のみ）です。
+`frontend/` に入っているのは、**最小構成のプレーンなサンプル**です（編集・削除 UI なし）。
 
 - URL パラメータ `board_id` / `task_id` からタスクを取得
 - 画像一覧をテーブル表示
@@ -161,14 +165,11 @@ Task クリック時の遷移先:
 - CSV 出力
 - 未ログイン時は `login.html` へリダイレクト
 
-用途例:
-
-- **お客さんに見せる用**: 名刺一覧の閲覧（GET のみ）
-- **ご自身のカスタムUI**: 領収書のチェック・編集（GET + PATCH / DELETE など）
+AI との対話では、作りたい機能をそのまま伝えればよい（編集・削除・並べ替えなど）。用途のカテゴリ分けは不要。
 
 ## output スキーマ
 
-読み取り結果 `output` は **`labels` + `content` 形式のみ** 使用します。
+読み取り結果 `output` は **`labels` + `content` 形式のみ** 使用します。この形式は固定で、変更できません。変えられるのは中の項目名・ラベル・値だけです。
 
 ```json
 {
@@ -184,20 +185,20 @@ Rule 作成時にこの形式で output を決め、AI との対話でも同じ�
 
 ## 外部 API
 
-外部サービスとの連携（例: 登録番号から会社名を取得）は、**お客さん向け・ご自身のカスタムUIどちらでも** 利用できます。  
-設定値（URL や API キーなど）は HTML 内に直接書き込みます。
+外部サービスとの連携（例: 登録番号から会社名を取得）が必要なら、HTML 内に設定値を直接書き込みます。
 
 ## API エンドポイント（参考）
 
 API のベース URL は `{BASE_URL}/snb/api` です。
 
-| 操作 | メソッド | パス | 用途 |
+| 操作 | メソッド | パス | 備考 |
 |---|---|---|---|
 | ログイン | POST | `/snb/api/auth/login` | 共通 |
-| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | 共通 |
-| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | ご自身のカスタムUI |
-| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | ご自身のカスタムUI |
-| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` | ご自身のカスタムUI |
+| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | user / admin 共通 |
+| タスク一覧 | POST | `/snb/api/v1/boards/{board_id}/tasks/search` | user は自分の分のみ |
+| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | user / admin 共通 |
+| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | user / admin 共通 |
+| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` | user / admin 共通 |
 
 ## 技術スタック
 
