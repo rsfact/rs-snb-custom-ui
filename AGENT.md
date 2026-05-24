@@ -12,16 +12,20 @@
 
 ## ユーザーの作業フロー（理解しておくこと）
 
-1. このリポジトリを AI に渡し、対話で `index.html` / `login.html` を得る
-2. AI が URL → **Dify 済みか** → output 構造の順に確認する
-3. Windows のメモ帳などでローカルファイルに貼り付ける
-4. SNB で Rule（Dify 連携）→ Task を作り、試しにドキュメントをアップロードする
-5. ボード画面の Task カード左上からクエリ（`?board_id=...&task_id=...`）をコピーする
-6. ローカルの `index.html` をブラウザで開き、アドレスバー末尾にクエリを貼り付けて Enter
-7. 表示結果を見て UI を調整（AI に修正依頼 → 貼り付け → F5 で再確認）
-8. 完成コードをエンジニアに共有（配置はエンジニアが行う）
+**この順番で進める。** AI は毎回 **次の1ステップだけ** 案内する（全手順を一度に並べない）。
 
-コード出力後は、**次の1ステップだけ** を案内する（全ステップを一度に並べない）。詳細は「コード出力後の案内」を参照。
+| # | 段階 | ユーザーがすること |
+|---|---|---|
+| 0 | URL を教える | Scanners Base の URL を AI に伝える |
+| 1 | **Dify の作成** | output 項目を決める → Dify DSL を保存して import → **公開** |
+| 2 | **Rule の設定** | Dify で API キー発行 → SNB の Rule に設定（正規表現は AI がテーマから提案） |
+| 3 | **index.html / login.html の作成** | AI と対話して画面を決める → コードを保存 |
+| 4 | **開く** | 保存した `index.html` をブラウザで開く |
+| 5 | **「サンプル」フォルダ** | SNB で **「サンプル」** フォルダを新規作成 → 書類を1枚アップロード → クエリをコピー |
+| 6 | **クエリを貼り付け** | ブラウザのアドレスバー末尾にクエリを貼って Enter → ログイン → **表示できたか AI に報告** |
+| 7 | 調整・完成 | 表示 OK ならエンジニアへ共有 / NG なら AI と一緒に解決 → 修正 → F5 |
+
+コード出力後の案内は「コード出力後の案内」を参照。Dify / Rule / HTML それぞれの段階でも **次の1ステップだけ** 出す。
 
 ## 最初の一言（必須・他の質問より先）
 
@@ -64,10 +68,10 @@ URL を受け取ったら、**画面の話に入る前に** Dify の有無 → o
 2. ユーザーが貼った JSON を確認する
    - `{ labels, content }` 形式か検証する
    - 形式が違えば **変更できない** と伝え、Dify 側を `{ labels, content }` に直すよう案内する
-3. 合っていればその JSON を **output 構造として記憶** し、UI のヒアリングへ進む
-4. **Rule の設定** も済んでいるか確認する。未設定なら **「Dify 完成後の案内」** に沿って、API キー発行と Rule 設定を **同時に** 案内する（Dify は既に組まれている場合も、API キーが未発行なら同じ手順で案内）
+3. 合っていればその JSON を **output 構造として記憶** する
+4. **Rule の設定** も済んでいるか確認する。未設定なら **「Dify 公開の確認」** → **「Dify 完成後の案内」**（API キー + Rule）を案内。**Rule 設定が済むまで UI のヒアリングに進まない**（ユーザーが UI を先に進めたいと言えば進めてよい）
 
-Rule 設定済みなら UI ヒアリングへ。未設定なら設定完了を待ってから進む（ユーザーが UI を先に進めたいと言えば進めてよい）。
+Rule 設定済みなら **UI のヒアリング**（段階3）へ。
 
 ### パターン B: Dify 未設定
 
@@ -77,11 +81,11 @@ Rule 設定済みなら UI ヒアリングへ。未設定なら設定完了を�
 4. 次を提案する:
 
 > **Dify、お作りしましょうか？**  
-> このリポジトリにある `dify.yml` をベースに、決めた読み取り項目に合わせたワークフローを用意できます。
+> この指示書（AGENT.md）にある Dify テンプレートをベースに、決めた読み取り項目に合わせたワークフローを用意できます。
 
 5. ユーザーが **作ってほしい** と言ったら → 「Dify ワークフローの作成」に進む（下記）
 6. ユーザーが **自分で組む** と言ったら → 確定した JSON 形式だけ渡し、Dify 完成後に **「Dify 完成後の案内」** で API キー + Rule を同時案内
-7. ユーザーが「import した」「設定した」と返すまで待ってもよい（先に UI を進めたいと言えば進めてよい）
+7. ユーザーが「import した」「Rule 設定した」と返すまで待ってもよい。**Rule 完了後に UI へ**（先に UI を進めたいと言えば進めてよい）
 
 提案例（名刺）:
 
@@ -102,9 +106,9 @@ Rule 設定済みなら UI ヒアリングへ。未設定なら設定完了を�
 }
 ```
 
-### Dify ワークフローの作成（`dify.yml`）
+### Dify ワークフローの作成
 
-リポジトリの **`dify.yml`** は汎用テンプレート。**output 周りだけ書き換える前提。** ユーザーが Dify を作りたいと言ったら、このファイルをベースにカスタマイズして出力する。
+本書 **「Dify DSL テンプレート（全文）」** に汎用テンプレートを収録している。**output 周りだけ書き換える前提。** ユーザーが Dify を作りたいと言ったら、このテンプレートをベースにカスタマイズして出力する。
 
 #### 書き換えてよい箇所（ここだけ。最小限に）
 
@@ -126,17 +130,523 @@ Rule 設定済みなら UI ヒアリングへ。未設定なら設定完了を�
 
 **YML はごちゃごちゃさせない。** 項目の追加・削除に必要な最小 diff だけ。テンプレートの構造を組み替えない。
 
+#### Dify DSL テンプレート（全文）
+
+カスタマイズの **ベース** として使う。下記をそのまま複製し、上記「書き換えてよい箇所」だけ最小限変更する。
+
+```yaml
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  name: SNB テンプレYML
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.3.8@592c8252795b5f75807de2d609a03196ed02596b409f7642b4a07548c7ff57ef
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1779208306569-source-1779348611854-target
+      selected: false
+      source: '1779208306569'
+      sourceHandle: source
+      target: '1779348611854'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1779348611854-source-1778727325919-target
+      selected: false
+      source: '1779348611854'
+      sourceHandle: source
+      target: '1778727325919'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: http-request
+      id: 1778727295551-source-1778727311635-target
+      selected: false
+      source: '1778727295551'
+      sourceHandle: source
+      target: '1778727311635'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 17793515996460-source-1779351623030-target
+      selected: false
+      source: '17793515996460'
+      sourceHandle: source
+      target: '1779351623030'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 17793515830970-source-17793515996460-target
+      selected: false
+      source: '17793515830970'
+      sourceHandle: source
+      target: '17793515996460'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1778727304418-source-1779208306569-target
+      selected: false
+      source: '1778727304418'
+      sourceHandle: source
+      target: '1779208306569'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1778727304418-fail-branch-17793515830970-target
+      selected: false
+      source: '1778727304418'
+      sourceHandle: fail-branch
+      target: '17793515830970'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: 1778727311635-source-1778727304418-target
+      selected: false
+      source: '1778727311635'
+      sourceHandle: source
+      target: '1778727304418'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: image_url
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: image_url
+      height: 109
+      id: '1778727295551'
+      position:
+        x: 0
+        y: 36
+      positionAbsolute:
+        x: 0
+        y: 36
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        error_strategy: fail-branch
+        model:
+          completion_params: {}
+          mode: chat
+          name: gpt-4.1
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 98712cf2-8844-4c1e-b4fa-5b6a419f4ab6
+          role: system
+          text: '# 役割
+
+            あなたは
+
+
+            # 指示
+
+            与えられるドキュメントのOCRを構造化出力に従って行って下さい。
+
+
+            # 注意
+
+            '
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              item1:
+                type: string
+              item2:
+                type: string
+            required:
+            - item1
+            - item2
+            type: object
+        structured_output_enabled: true
+        title: OCR
+        type: llm
+        vision:
+          configs:
+            detail: high
+            variable_selector:
+            - '1778727311635'
+            - files
+          enabled: true
+      height: 124
+      id: '1778727304418'
+      position:
+        x: 684
+        y: 29
+      positionAbsolute:
+        x: 684
+        y: 29
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: ''
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: false
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: 画像のGET
+        type: http-request
+        url: '{{#1778727295551.image_url#}}'
+        variables: []
+      height: 95
+      id: '1778727311635'
+      position:
+        x: 342
+        y: 43
+      positionAbsolute:
+        x: 342
+        y: 43
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1779208306569'
+          - content
+          value_type: object
+          variable: content
+        - value_selector:
+          - '1779348611854'
+          - labels
+          value_type: object
+          variable: labels
+        - value_selector:
+          - '1779208306569'
+          - is_failed
+          value_type: boolean
+          variable: is_failed
+        selected: false
+        title: 出力
+        type: end
+      height: 140
+      id: '1778727325919'
+      position:
+        x: 1710
+        y: 0
+      positionAbsolute:
+        x: 1710
+        y: 0
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(item1: str, item2: str) -> dict:\n    items = [item1, item2]\n\
+          \    is_failed = any(item is None for item in items)\n\n    return {\n \
+          \       \"content\": {\n            \"item1\": item1,\n            \"item2\"\
+          : item2\n        },\n        \"is_failed\": is_failed,\n    }"
+        code_language: python3
+        outputs:
+          content:
+            children: null
+            type: object
+          is_failed:
+            children: null
+            type: boolean
+        selected: false
+        title: contentを括る
+        type: code
+        variables:
+        - value_selector:
+          - '1778727304418'
+          - structured_output
+          - item1
+          value_type: object
+          variable: item1
+        - value_selector:
+          - '1778727304418'
+          - structured_output
+          - item2
+          value_type: object
+          variable: item2
+      height: 52
+      id: '1779208306569'
+      position:
+        x: 1026
+        y: 44
+      positionAbsolute:
+        x: 1026
+        y: 44
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
+          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
+          \   }"
+        code_language: python3
+        outputs:
+          labels:
+            children: null
+            type: object
+        selected: false
+        title: labelsの割り当て
+        type: code
+        variables: []
+      height: 52
+      id: '1779348611854'
+      position:
+        x: 1368
+        y: 44
+      positionAbsolute:
+        x: 1368
+        y: 44
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"content\": {\n       \
+          \     \"item1\": None,\n            \"item2\": None,\n        },\n     \
+          \   \"is_failed\": True,\n    }"
+        code_language: python3
+        outputs:
+          content:
+            children: null
+            type: object
+          is_failed:
+            children: null
+            type: boolean
+        selected: true
+        title: contentを括る
+        type: code
+        variables: []
+      height: 52
+      id: '17793515830970'
+      position:
+        x: 1046
+        y: 176
+      positionAbsolute:
+        x: 1046
+        y: 176
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main() -> dict:\n    return {\n        \"labels\": {\n        \
+          \    \"item1\": \"項目１\",\n            \"item2\": \"項目２\",\n        }\n \
+          \   }"
+        code_language: python3
+        outputs:
+          labels:
+            children: null
+            type: object
+        selected: false
+        title: labelsの割り当て
+        type: code
+        variables: []
+      height: 52
+      id: '17793515996460'
+      position:
+        x: 1388
+        y: 176
+      positionAbsolute:
+        x: 1388
+        y: 176
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '17793515996460'
+          - labels
+          value_type: object
+          variable: labels
+        - value_selector:
+          - '17793515830970'
+          - content
+          value_type: object
+          variable: content
+        - value_selector:
+          - '17793515830970'
+          - is_failed
+          value_type: boolean
+          variable: is_failed
+        selected: false
+        title: 出力
+        type: end
+      height: 140
+      id: '1779351623030'
+      position:
+        x: 1750
+        y: 220
+      positionAbsolute:
+        x: 1750
+        y: 220
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -89.67146560456251
+      y: 172.08420480147683
+      zoom: 1.0997773402620763
+  rag_pipeline_variables: []
+```
+
 #### 出力とユーザーへの案内
 
-1. カスタマイズした **`dify.yml` 全文** を出力する（ファイル名は `dify.yml`）
+1. テンプレートをベースにカスタマイズした **Dify DSL（YAML）全文** を出力する（ユーザーが保存するファイル名は `dify.yml`）
 2. **次の1ステップだけ** 案内する:
 
 > **次にやること**  
 > 上の内容を `dify.yml` という名前で保存し、Dify の「DSL ファイルをインポート」から読み込んでください。import できたら教えてください。
 
-3. import 完了後（ユーザーが「Dify できた」「import した」と返したら）→ **「Dify 完成後の案内」** を **1回の返答** で出す（API キー発行 + Rule 設定を同時に。分けない）
+3. import 完了後（ユーザーが「Dify できた」「import した」と返したら）→ **「Dify 公開の確認」** を案内
+4. 公開済みと確認できたら → **「Dify 完成後の案内」** を **1回の返答** で出す（API キー発行 + Rule 設定を同時に。分けない）
 
 Dify 用 YML を出すときも、HTML と同様 **次の1ステップだけ**。ただし Dify 完成後の案内は、API キーと Rule を **セットで1ステップ** として扱う。
+
+### Dify 公開の確認
+
+DSL を import したあと、**API キー発行の案内に進む前に**、Dify の **公開** を確認する。
+
+> **次にやること**  
+> Dify で import したワークフローは、**公開** しましたか？  
+> 公開していないと API キーが使えません。右上などの **「公開」** ボタンから公開してください。公開できたら教えてください。
+
+- **公開済み** と返答 → **「Dify 完成後の案内」** へ
+- **まだ / わからない** → 公開手順だけ短く案内し、公開完了を待つ
+- Dify 済み（パターン A）で Rule 未設定の場合も、API キー案内前に公開状態を念のため確認してよい
 
 ### Dify 完成後の案内（API キー発行 + Rule 設定）
 
@@ -159,11 +669,42 @@ Dify 用 YML を出すときも、HTML と同様 **次の1ステップだけ**�
 | SNB の入力欄 | 入れる値 |
 |---|---|
 | **ルール名（name）** | わかりやすい名前（例: `名刺読み取り`） |
-| **正規表現** | ボード ID にマッチするパターン（例: `^board-001$`） |
+| **正規表現** | 下記「正規表現の提案」を参照（AI がテーマから提案する） |
 | **Dify URL** | さきほどコピーした **ベース URL** |
 | **APIキー** | さきほど発行した **API キー** |
 
 3. 保存する
+
+#### 正規表現の提案（Rule 設定時に必ず補助する）
+
+Rule 設定を案内するとき、**正規表現はユーザーに丸投げしない。** 作りたいテーマ（名刺、領収書、契約書など）から **AI が提案** する。
+
+**基本パターン:** `^{theme}-.*$`
+
+- `{theme}` … テーマを英小文字のスラッグにしたもの（例: 名刺 → `meishi`、領収書 → `ryoshusho`）
+- このパターンなら `{theme}-001` や `{theme}-test` など、同じテーマの board_id にまとめてマッチする
+
+**提案例:**
+
+| 作りたいテーマ | 正規表現の提案 | マッチする board_id の例 |
+|---|---|---|
+| 名刺 | `^meishi-.*$` | `meishi-001`, `meishi-test` |
+| 領収書 | `^ryoshusho-.*$` | `ryoshusho-001` |
+| 契約書 | `^keiyakusho-.*$` | `keiyakusho-main` |
+
+**ユーザー向けの説明（そのまま使ってよい）:**
+
+> **正規表現** は、どのボードでこの Rule を使うかを決める設定です。  
+> 名刺用なら `^meishi-.*$` がおすすめです。`meishi-001` や `meishi-test` のような board_id にマッチします。  
+> すでに使っている board_id があれば、それに合わせて調整します。
+
+**調整ルール:**
+
+- ユーザーが **既存の board_id** を教えたら、それに合わせる（1件だけなら `^meishi-001$` のように完全一致も可）
+- テーマが複数ある場合は、用途ごとに Rule を分けるか、より広いパターンを相談する
+- 正規表現の意味は **1〜2文** で説明する。詳しい技術解説は不要
+
+**theme スラッグの決め方:** 日本語テーマをローマ字または短い英単語にする。迷ったらユーザーに「board_id の先頭部分は `meishi` のように英字でよいですか？」と確認してよい。
 
 #### ユーザーへの案内例（そのまま使ってよい）
 
@@ -177,28 +718,27 @@ Dify 用 YML を出すときも、HTML と同様 **次の1ステップだけ**�
 > **2. Scanners Base の Rule に設定**
 > - Scanners Base のコンソールで Rule を作成（または編集）してください
 > - **ルール名** … 例: `名刺読み取り`
-> - **正規表現** … 使うボード ID に合わせたパターン（例: `^board-001$`）
+> - **正規表現** … 例: `^meishi-.*$`（名刺用。`meishi-001` などにマッチします）
 > - **Dify URL** … 手順1でコピーしたベース URL
 > - **APIキー** … 手順1で発行した API キー
 > - 保存してください
 >
-> 設定できたら教えてください。試しに1枚アップロードして、読み取り結果を確認しましょう。
+> 設定できたら教えてください。次に画面（HTML）の作成に進みましょう。
 
-正規表現はユーザーのボード ID が分かれば具体例を出す。分からなければ「使うボードの ID を教えてください」と聞く。
-
-Rule 設定後 → **次の1ステップ** で試しアップロードを案内する。
+Rule 設定後 → **段階3（UI のヒアリング）** へ進む。試し用の書類アップロードは HTML 完成後の「サンプル」フォルダ作成時に案内する。
 
 ### Dify・Rule について（ユーザー向け説明）
 
 - **Dify** … 画像を読み取って JSON を返す AI ワークフロー。出力は **必ず `{ labels, content }` 形式**
 - **SNB の Rule** … Dify とボードを紐づける設定。最低限 **ルール名 / Dify URL / APIキー / 正規表現** が必要
 - Dify 完成後は **API キー発行** と **Rule 設定** を **1回の案内でまとめて** 行う（「Dify 完成後の案内」参照）
+- **正規表現** は作りたいテーマから `^{theme}-.*$` を提案して補助する
 - Dify 済みの場合、構造化出力 JSON の **丸投げで OK**
-- **試しアップロードで output を確認してから** ローカル UI の動作確認に進むとスムーズ
+- **Rule 設定が済んでから** UI（HTML）のヒアリングに進む
 
-## 最初に確認すること
+## 最初に確認すること（段階3: UI のヒアリング）
 
-**output 構造と Dify の確認が済んだあと**、次をユーザーから聞き取ってください。
+**Dify の作成（段階1）と Rule の設定（段階2）が済んだあと**、次をユーザーから聞き取ってください。
 
 1. **UI のタイトル**（例: 「名刺ビュー」「領収書チェック」）
 2. **favicon / アイコン**（Font Awesome のクラス名、例: `fa-address-card`）
@@ -278,7 +818,7 @@ const EXTERNAL_API_KEY = "your-api-key-here";
 
 ## 出力ルール
 
-- 出力ファイルは通常 **`frontend/index.html`** と **`frontend/login.html`** の2つ。Dify 作成時のみ **`dify.yml`** も出力可
+- 出力ファイルは通常 **`frontend/index.html`** と **`frontend/login.html`** の2つ。Dify 作成時はカスタマイズした **Dify DSL（YAML）** も出力可（テンプレートは AGENT.md 内）
 - 各ファイルは **単一 HTML ファイル**（外部 JS / CSS ファイルは作らない）
 - ビルドステップ不要（CDN の Tailwind / Font Awesome / Alpine.js を使う）
 - コードはコピーしてそのまま配置できる完全な HTML にする
@@ -390,7 +930,7 @@ const API_BASE = SNB_ORIGIN
 - `index.html` と `login.html` の **両方** に同じ `SNB_ORIGIN` を設定する
 - ユーザー向けの初回出力では `SNB_ORIGIN` を **空文字にしない**（必ず聞いた URL を入れる）
 - エンジニア向けの最終引き渡し時は、配置後に空文字に戻す旨を添えてもよい
-- ユーザーへの案内例: 「`index.html` を保存したら、ブラウザで開いて、アドレスバーの末尾にコピーしたクエリを貼り付けて Enter してください」
+- ローカル確認の流れ: **保存 → ブラウザで開く → 「サンプル」フォルダ作成 → 書類アップロード → クエリをコピー → アドレスバー末尾に貼り付け → 表示確認を報告**
 
 ## 認証
 
@@ -588,18 +1128,67 @@ function normalizeOutput(output) {
 
 ### 手順の順番（AI 内部用。ユーザーには1つずつ出す）
 
-| # | タイミング | ユーザーへの案内（例） |
-|---|---|---|
-| 1 | コードを初めて出力した直後 | メモ帳で `index.html` と `login.html` に貼り付けて、**同じフォルダ** に保存する |
-| 2 | 保存できたと返事があったら | Scanners Base のボードで、Task カード左上から **クエリをコピー** する |
-| 2b | `dify.yml` を出力した直後 | `dify.yml` を保存し、Dify で **DSL インポート** する |
-| 2c | Dify import / 完成の返事があったら | **「Dify 完成後の案内」** … API キー発行 + Rule 設定を **1回で** 案内 |
-| 2d | Rule 設定できたと返事があったら | 試しに **1枚アップロード** して読み取り結果を確認する |
-| 3 | クエリをコピーしたら | 保存した `index.html` をブラウザで開き、アドレスバー **末尾にクエリを貼り付けて Enter** |
-| 4 | ブラウザで開いたら | ログイン画面が出たら **Scanners Base と同じアカウント** でログインする |
-| 5 | 画面が表示されたら | 表示を確認し、直したい点があれば教えてもらう |
-| 6 | 修正を反映した直後 | ファイルを貼り替えて、ブラウザで **F5（再読み込み）** する |
-| 7 | 完成したら | エンジニアに `index.html` と `login.html` を渡す |
+全体の流れは **段階0〜7**（冒頭「ユーザーの作業フロー」参照）。以下は各段階での **次の1ステップ** 案内。
+
+| # | 段階 | タイミング | ユーザーへの案内（例） |
+|---|---|---|---|
+| 1a | 1 Dify | output 確定後、Dify DSL を出力した直後 | 出力内容を `dify.yml` として保存し、Dify で **DSL インポート** する |
+| 1a2 | 1 Dify | import 完了の返事があったら | **Dify を公開しましたか？** … 未公開なら公開を案内 |
+| 1b | 1 Dify | 公開済みと確認できたら | **「Dify 完成後の案内」** … API キー発行 + Rule 設定（正規表現提案付き）を **1回で** 案内 |
+| 2 | 2 Rule | Rule 設定完了の返事があったら | 画面の作り方についてヒアリング開始（タイトル・機能など） |
+| 3a | 3 HTML | コードを初めて出力した直後 | メモ帳で `index.html` と `login.html` に貼り付けて、**同じフォルダ** に保存する |
+| 3b | 4 開く | 保存できたと返事があったら | 保存した `index.html` を **ブラウザで開く**（クエリなしでもよい。ログイン画面が出る場合あり） |
+| 3c | 5 サンプル | ブラウザで開けたと返事があったら | SNB のアップロード画面で **「サンプル」フォルダを新規作成** する |
+| 3d | 5 アップロード | フォルダを作ったと返事があったら | 作成した **「サンプル」フォルダを開き**、試し用の書類を **1枚アップロード** する |
+| 3e | 5 クエリ | アップロードしたと返事があったら | 「サンプル」フォルダのカード左上から **クエリをコピー** する |
+| 3f | 6 貼り付け | クエリをコピーしたと返事があったら | 開いているブラウザのアドレスバー **末尾にクエリを貼り付けて Enter** |
+| 3g | 6 ログイン | ログイン画面が出たら | **Scanners Base と同じアカウント** でログインする |
+| 3h | 6 表示確認 | ログイン後 / 画面が出たら | **「index.html?... から、うまく表示されましたか？」** と確認を求める |
+| 4a | 7 成功 | うまく表示されたと返事があったら | **`index.html` と `login.html` の2つをエンジニアに共有** するよう案内 |
+| 4b | 7 調整 | 表示はできたが直したい点がある | 表示を確認し、直したい点を教えてもらう |
+| 4c | 7 失敗 | うまく表示されなかった | **「表示確認とトラブルシュート」** に沿って解決を図る |
+| 5 | 7 修正 | 修正を反映した直後 | ファイルを貼り替えて、ブラウザで **F5（再読み込み）** する |
+
+**「サンプル」フォルダについて:** ローカル確認用のフォルダ名は **必ず「サンプル」** と案内する。正規表現に合う board_id のボード上で作成する（例: `^meishi-.*$` なら `meishi-001` など）。SNB 上では Task = フォルダ。
+
+### 表示確認とトラブルシュート
+
+クエリを貼り付けてログインしたあと、**必ず表示結果を確認させる。** いきなり次の工程に進まない。
+
+#### 表示確認（必須）
+
+> **確認させてください**  
+> `index.html?...` から、画面は **うまく表示されましたか？**  
+> 読み取り結果や書類の一覧が見えていれば OK です。うまくいかなかった場合は、どんな表示になったか教えてください。
+
+#### うまくいった場合
+
+- 直したい点が **なければ** → **次の1ステップ** でエンジニアへの共有を案内:
+
+> **次にやること**  
+> 画面の確認ありがとうございます。問題なければ、保存した **`index.html` と `login.html` の2つ** をエンジニアに共有してください。配置はエンジニアが行います。
+
+- 直したい点が **あれば** → 修正ヒアリングへ（段階7・調整）
+
+#### うまくいかなかった場合
+
+原因を切り分けながら **一緒に解決** する。非エンジニア向けに、次を **順に** 確認する（一度に全部並べず、1つずつ）。
+
+| 確認項目 | 聞き方・案内の例 |
+|---|---|
+| **書類がアップロードされているか** | 「サンプル」フォルダに、試し用の書類は **1枚以上** アップロードされていますか？ |
+| **読み取りが完了しているか** | アップロード後、読み取りが終わるまで少し待ちましたか？ 読み取り中の表示はありませんか？ |
+| **クエリが正しいか** | アドレスバーに `?board_id=...&task_id=...` が付いていますか？ 「サンプル」フォルダからコピーしたクエリですか？ |
+| **ログインできているか** | Scanners Base と **同じアカウント** でログインできましたか？ |
+| **SNB_ORIGIN** | `index.html` 内の URL は、教えていただいた Scanners Base の URL と一致していますか？ |
+| **Dify / Rule** | Rule は保存済みですか？ Dify は **公開済み** で、API キーは正しく設定されていますか？ |
+
+**書類未アップロードが原因のとき**（そのまま使ってよい）:
+
+> **次にやること**  
+> Scanners Base のアップロード画面で **「サンプル」フォルダを開き**、右下の **「+」** から試し用の書類（PNG / JPEG）を **1枚アップロード** してください。読み取りが終わったら、もう一度 `index.html?...` を開いて確認してください。
+
+解決したら、再度 **「うまく表示されましたか？」** と確認する。OK になったらエンジニアへの共有を案内する。
 
 ### 案内の書き方
 
@@ -624,19 +1213,27 @@ function normalizeOutput(output) {
 
 ## 対話の進め方
 
-1. **メインシステムの URL を聞く**（必須・最初。URL が来るまで先に進まない）
+1. **メインシステムの URL を聞く**（段階0・必須。URL が来るまで先に進まない）
 2. URL を確認し、`SNB_ORIGIN` として記憶する
-3. **Dify は組まれているか聞く**（必須・URL の直後）
-   - **Dify 済み** → 構造化出力 JSON の丸投げを促す → `{ labels, content }` を検証 → Rule 未設定なら **「Dify 完成後の案内」** で API キー + Rule を同時案内
-   - **Dify 未設定** → output スキーマを対話で確定 → **「Dify、お作りしましょうか？」** と提案 → 要望があれば `dify.yml` を最小限書き換えて出力 → Dify import を案内 → 完成後に **API キー発行 + Rule 設定を同時案内**
-4. output 構造が確定し、Dify / Rule の状態が確認できたら、UI のヒアリングへ
-5. **主な機能** をユーザー向けの言葉で提案し、画面構成をテキストまたは ASCII で説明して合意を取る（エンジニア用語は使わない）
-6. デザインの意向が不足していれば **念のため** 短く確認する（「デザインの確認」参照）。お任せならそのまま進む
-7. `frontend/index.html` と `frontend/login.html` を出力（デザインの説明 + **次の1ステップ** の案内をセットで）
-8. ユーザーの返事に応じて、**次の1ステップだけ** 案内する（全手順を一度に出さない）
-9. ユーザーから修正依頼があれば、該当ファイルを更新して再出力（デザイン説明の差分 + **次の1ステップ**）。無理な要望は **「それは機能的にできません」** と返す
-10. 完成したらエンジニアに渡すよう促す（配置作業はエンジニア向け）
-11. 制約に反する要望が来たら、コードを出す前に「できないことの伝え方」に沿って断る
+3. **段階1: Dify の作成**
+   - **Dify 済み** → 構造化出力 JSON の丸投げを促す → `{ labels, content }` を検証
+   - **Dify 未設定** → output スキーマを対話で確定 → **「Dify、お作りしましょうか？」** → 要望があれば AGENT.md 内テンプレートを最小限書き換えて DSL を出力 → import を案内
+4. **段階2: Rule の設定**
+   - Dify 完成後 → **「Dify 完成後の案内」** で API キー + Rule を同時案内（**正規表現はテーマから `^{theme}-.*$` を提案**）
+   - Rule 設定完了まで **UI のヒアリングに進まない**（ユーザーが先に UI を進めたいと言えば進めてよい）
+5. **段階3: index.html / login.html の作成**
+   - UI タイトル・機能・画面構成をヒアリング → **主な機能** をユーザー向けの言葉で提案して合意
+   - デザインの意向が不足していれば **念のため** 短く確認（「デザインの確認」参照）
+   - `frontend/index.html` と `frontend/login.html` を出力（デザインの説明 + **次の1ステップ** = 保存）
+6. **段階4〜6: ローカル確認**
+   - 保存 → ブラウザで **開く** → **「サンプル」フォルダ新規作成** → **書類アップロード** → **クエリをコピー** → **貼り付け** → ログイン
+   - **「うまく表示されましたか？」** と必ず確認（「表示確認とトラブルシュート」参照）
+   - 各ステップは **次の1ステップだけ** 案内
+7. **段階7: 調整・完成**
+   - **表示 OK** → `index.html` と `login.html` の **2つをエンジニアに共有** するよう案内
+   - **表示 NG** → トラブルシュート（書類アップロード有無など）→ 解決後に再度表示確認
+   - 修正依頼があれば再出力（デザイン説明の差分 + **次の1ステップ**）。無理な要望は **「それは機能的にできません」**
+8. 制約に反する要望が来たら、コードを出す前に「できないことの伝え方」に沿って断る
 
 ## やってはいけないこと
 
@@ -650,9 +1247,10 @@ function normalizeOutput(output) {
 - 用途カテゴリ（お客さん向け / 自分用など）を勝手に決めたり、ユーザーに聞いたりしない
 - **主な機能** の提案文に GET / PATCH / API / モーダル などエンジニア向けの言葉を使わない
 - できない要望を、**「それは機能的にできません」** と言わずに無理やり実装しない
-- `dify.yml` を **ごちゃごちゃ書き換えない**（output 周りの最小 diff のみ）
+- Dify DSL テンプレートを **ごちゃごちゃ書き換えない**（output 周りの最小 diff のみ）
 - コード出力後に **作業手順を一度に全部** 並べない（**次の1ステップだけ** 案内する）
 - 機能の合意後、デザインの意向が読み取れないのに **確認もせず** いきなりコードだけ出す（不足時は「デザインの確認」で念のため聞く）
+- クエリ貼り付け・ログイン後、**表示確認をせず** いきなりエンジニア共有や修正に進む
 - README.md や AGENT.md を変更しない（ユーザーが明示的に依頼した場合を除く）
 
 ## 現在のデフォルトサンプル
