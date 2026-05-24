@@ -156,12 +156,10 @@
 
     function normalizeOutput(output) {
       const data = output && typeof output === "object" ? output : {};
-      if (data.content && typeof data.content === "object") {
-        const labels = data.labels && typeof data.labels === "object" ? data.labels : {};
-        const keys = [...Object.keys(labels), ...Object.keys(data.content).filter((k) => !Object.prototype.hasOwnProperty.call(labels, k))];
-        return keys.map((key) => ({ key, label: labels[key] || key, value: data.content[key] ?? "" }));
-      }
-      return Object.keys(data).map((key) => ({ key, label: key, value: data[key] ?? "" }));
+      const content = data.content && typeof data.content === "object" ? data.content : {};
+      const labels = data.labels && typeof data.labels === "object" ? data.labels : {};
+      const keys = [...Object.keys(labels), ...Object.keys(content).filter((k) => !Object.prototype.hasOwnProperty.call(labels, k))];
+      return keys.map((key) => ({ key, label: labels[key] || key, value: content[key] ?? "" }));
     }
 
     function toCsvCell(value) {
@@ -172,11 +170,11 @@
 
     function buildOutputRecord(output) {
       const data = output && typeof output === "object" ? output : {};
-      const source = data.content && typeof data.content === "object" ? data.content : data;
+      const content = data.content && typeof data.content === "object" ? data.content : {};
       const labels = data.labels && typeof data.labels === "object" ? data.labels : {};
       const record = {};
-      Object.keys(source || {}).forEach((key) => {
-        const value = source[key];
+      Object.keys(content).forEach((key) => {
+        const value = content[key];
         if (value === null || value === undefined) {
           record[key] = "";
         } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -331,7 +329,6 @@
         imgs.forEach((img, idx) => {
           const displayName =
             (img.output && img.output.content && img.output.content.name) ||
-            (img.output && img.output.name) ||
             "（氏名なし）";
 
           const row = document.createElement("tr");

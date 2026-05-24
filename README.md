@@ -40,10 +40,10 @@ SNB メイン画面（ボード）
 1. この GitHub リポジトリを、普段お使いの AI に渡す
 2. AI が最初に **いまお使いのメインシステム（Scanners Base）の URL** を聞いてくるので、教える  
    例: `https://your-company.example.com`（ブラウザのアドレスバーに表示されている URL）
-3. URL を伝えたあと、「こんな画面が作りたい」と対話する
+3. URL を伝えたあと、AI が **用途**（お客さんに見せる用か、ご自身のカスタムUIか）を聞いてくる
+4. 用途を伝えたあと、「こんな画面が作りたい」と対話する
    - UI のタイトル、色、表示したい項目
-   - 閲覧だけでよいか、編集も必要か
-4. AI が `index.html` と `login.html` のコードを出力してくれる（`SNB_ORIGIN` には教えた URL が入っている）
+5. AI が `index.html` と `login.html` のコードを出力してくれる（`SNB_ORIGIN` には教えた URL が入っている）
 
 ### 2. ローカルに貼り付ける
 
@@ -153,7 +153,7 @@ Task クリック時の遷移先:
 
 ## デフォルトサンプル UI の動作
 
-`frontend/` に入っているのは **GET のみ** のプレーンなサンプルです。
+`frontend/` に入っているのは **お客さんに見せる用** のプレーンなサンプル（GET のみ）です。
 
 - URL パラメータ `board_id` / `task_id` からタスクを取得
 - 画像一覧をテーブル表示
@@ -163,26 +163,12 @@ Task クリック時の遷移先:
 
 用途例:
 
-- **user 向け**: 名刺一覧の閲覧
-- **admin 向け**: 同じ UI でも admin は全タスクを閲覧可能
-
-## API エンドポイント（参考）
-
-API のベース URL は `{BASE_URL}/snb/api` です。
-
-| 操作 | メソッド | パス |
-|---|---|---|
-| ログイン | POST | `/snb/api/auth/login` |
-| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` |
-| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` |
-| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` |
-| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` |
+- **お客さんに見せる用**: 名刺一覧の閲覧（GET のみ）
+- **ご自身のカスタムUI**: 領収書のチェック・編集（GET + PATCH / DELETE など）
 
 ## output スキーマ
 
-読み取り結果 `output` は UI ごとに自由に設計できます。
-
-**形式 A（labels + content）**
+読み取り結果 `output` は **`labels` + `content` 形式のみ** 使用します。
 
 ```json
 {
@@ -191,16 +177,27 @@ API のベース URL は `{BASE_URL}/snb/api` です。
 }
 ```
 
-**形式 B（フラット）**
+- `labels` … 各項目の日本語ラベル
+- `content` … 読み取り結果の値
 
-```json
-{
-  "name": "山田太郎",
-  "company": "株式会社ABC"
-}
-```
+Rule 作成時にこの形式で output を決め、AI との対話でも同じ形式を伝えてください。
 
-Rule 作成時に output の形式を決め、AI との対話でも同じ形式を伝えてください。
+## 外部 API
+
+外部サービスとの連携（例: 登録番号から会社名を取得）は、**お客さん向け・ご自身のカスタムUIどちらでも** 利用できます。  
+設定値（URL や API キーなど）は HTML 内に直接書き込みます。
+
+## API エンドポイント（参考）
+
+API のベース URL は `{BASE_URL}/snb/api` です。
+
+| 操作 | メソッド | パス | 用途 |
+|---|---|---|---|
+| ログイン | POST | `/snb/api/auth/login` | 共通 |
+| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | 共通 |
+| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | ご自身のカスタムUI |
+| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | ご自身のカスタムUI |
+| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` | ご自身のカスタムUI |
 
 ## 技術スタック
 

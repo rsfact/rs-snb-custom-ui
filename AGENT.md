@@ -38,7 +38,8 @@
 
 確認の返答例:
 
-> ありがとうございます。`https://example.com` ですね。では、どんな画面を作りたいか教えてください。
+> ありがとうございます。`https://example.com` ですね。  
+> 次に、この画面はお客さんに見せる用ですか？ それともご自身のカスタムUIですか？
 
 ユーザーが URL を変更した場合は、以降の出力すべてで `SNB_ORIGIN` を更新する。
 
@@ -46,13 +47,34 @@
 
 **`SNB_ORIGIN`（メインシステムの URL）を受け取ったあと**、次をユーザーから聞き取ってください。
 
-1. **UI のタイトル**（例: 「名刺ビュー」「領収書チェック」）
-2. **favicon / アイコン**（Font Awesome のクラス名、例: `fa-address-card`）
-3. **作りたい画面の説明**（一覧表示、編集、並べ替え、外部連携など）
-4. **output の JSON 構造**（読み取り結果の項目と日本語ラベル）
-5. **閲覧のみか、編集も必要か**
-   - 閲覧のみ → GET のみ（user ロールでも使える）
-   - 編集あり → PATCH / DELETE / POST も実装（admin ロール向け）
+1. **用途**（お客さんに見せる用か、ご自身のカスタムUIか）
+   - **お客さんに見せる用** → GET リクエストのみ（閲覧・CSV 出力など）。user ロールでも使える
+   - **ご自身のカスタムUI** → GET に加え、PATCH / DELETE / POST も実装可（編集・削除・アップロードなど。admin 向け）
+   - 聞き方の例: 「この画面は、お客さんに見せる用ですか？ それとも、ご自身のカスタムUIですか？」
+2. **UI のタイトル**（例: 「名刺ビュー」「領収書チェック」）
+3. **favicon / アイコン**（Font Awesome のクラス名、例: `fa-address-card`）
+4. **作りたい画面の説明**（一覧表示、編集、並べ替えなど）
+5. **output の JSON 構造**（`labels` + `content` 形式で、読み取り結果の項目と日本語ラベル）
+
+### 用途による API 制限
+
+| 用途 | 許可する SNB API | 備考 |
+|---|---|---|
+| お客さんに見せる用 | GET のみ | 閲覧専用 UI |
+| ご自身のカスタムUI | GET + PATCH + DELETE + POST | 編集・削除・アップロード UI |
+
+### 外部 API について
+
+外部 API の利用は **どちらの用途でも自由** にしてよい（例: インボイス番号から会社名を取得するなど）。
+
+外部 API 用の設定値（URL、API キーなど）は、HTML 内に **定数としてハードコードしてよい**。
+
+```javascript
+const EXTERNAL_API_BASE = "https://api.example.com";
+const EXTERNAL_API_KEY = "your-api-key-here";
+```
+
+ユーザーから値を聞き取り、コードに直接書き込む。非エンジニア向けに「環境変数」という言葉は使わず、「外部サービスの URL やキー」などと説明する。
 
 ## 出力ルール
 
@@ -254,7 +276,7 @@ DELETE {API_BASE}/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}
 
 UI は `output` JSON をもとに表示・編集する。ユーザーと対話してスキーマを決め、コード内に反映する。
 
-### 推奨形式（labels + content）
+**`labels` + `content` 形式のみ使用する。フラット形式は使わない。**
 
 ```json
 {
@@ -271,53 +293,45 @@ UI は `output` JSON をもとに表示・編集する。ユーザーと対話�
 }
 ```
 
-### フラット形式（シンプルな場合）
+- `labels` … 各項目の日本語ラベル
+- `content` … 読み取り結果の値
+- PATCH で保存するときも、必ず `{ labels, content }` の形で送る
 
-```json
-{
-  "name": "山田太郎",
-  "company": "株式会社ABC"
-}
-```
-
-表示用ヘルパー（どちらの形式にも対応）:
+表示用ヘルパー:
 
 ```javascript
 function normalizeOutput(output) {
   const data = output && typeof output === "object" ? output : {};
-  if (data.content && typeof data.content === "object") {
-    const labels = data.labels && typeof data.labels === "object" ? data.labels : {};
-    const keys = [...Object.keys(labels), ...Object.keys(data.content).filter(k => !labels[k])];
-    return keys.map(key => ({ key, label: labels[key] || key, value: data.content[key] ?? "" }));
-  }
-  return Object.keys(data).map(key => ({ key, label: key, value: data[key] ?? "" }));
+  const content = data.content && typeof data.content === "object" ? data.content : {};
+  const labels = data.labels && typeof data.labels === "object" ? data.labels : {};
+  const keys = [...Object.keys(labels), ...Object.keys(content).filter((k) => !Object.prototype.hasOwnProperty.call(labels, k))];
+  return keys.map((key) => ({ key, label: labels[key] || key, value: content[key] ?? "" }));
 }
 ```
 
-## UI パターン
+## 用途別の実装方針
 
-### パターン A: GET のみ（デフォルトサンプル）
+用途の回答に応じて、次のように実装を分ける。「パターン A / B」などの呼び方はユーザーに使わない。
 
-現在の `frontend/index.html` がこのパターン。
+### お客さんに見せる用
 
-- 画像一覧 + モーダル詳細
-- CSV エクスポート
-- 編集・削除なし
-- user / admin 両方が閲覧可能（admin は他人のタスクも可）
+- GET のみ（タスク・画像の閲覧）
+- 一覧表示、モーダル詳細、CSV 出力など
+- 編集・削除・アップロード UI は作らない
 
-参考: 名刺一覧（Sansan Clone 的な使い方）
+### ご自身のカスタムUI
 
-### パターン B: CRUD + 外部 API（admin 向け）
-
-- 画像を1枚ずつ表示し、output フィールドを編集
-- PATCH で保存、DELETE で削除
-- 並べ替え（例: 金額順）
-- 外部 API 連携（例: インボイス番号から会社名取得）
-- Alpine.js で状態管理
+- GET に加え PATCH / DELETE / POST を実装
+- 画像を1枚ずつ表示し、`content` のフィールドを編集して保存
+- 並べ替え（例: 金額順）など admin 向けの作業 UI
+- Alpine.js で状態管理するとよい
 
 参考: `scanners-base-v2/frontend/sub/receipt/`（領収書チェック）
 
-ユーザーが「編集したい」「チェックしたい」「外部 API と連携したい」と言ったらパターン B を選ぶ。
+### 外部 API（どちらの用途でも可）
+
+- 用途に関係なく、必要なら外部 API を呼び出してよい
+- 設定値は HTML 内の定数としてハードコードする
 
 ## 対話の進め方
 
@@ -339,14 +353,16 @@ function normalizeOutput(output) {
 
 - React / Vue / Next.js などビルドが必要なフレームワークを使わない
 - 複数ファイルに分割しない（HTML 1ファイル完結）
-- API ベース URL をユーザー確認なしで推測しない（必ず最初にメインシステムの URL を聞く）
+- SNB の API ベース URL（`SNB_ORIGIN`）をユーザー確認なしで推測しない
+- output をフラット形式（`labels` / `content` なし）で扱わない
+- お客さんに見せる用の UI に PATCH / DELETE / POST を実装しない
 - トークンを URL パラメータに載せない（localStorage のみ）
 - エンジニア向けの説明文を UI 上に表示しない
 - README.md や AGENT.md を変更しない（ユーザーが明示的に依頼した場合を除く）
 
 ## 現在のデフォルトサンプル
 
-`frontend/index.html` … GET のみの一覧 + モーダル + CSV  
+`frontend/index.html` … お客さんに見せる用（GET のみ）の一覧 + モーダル + CSV  
 `frontend/login.html` … メール / パスワードログイン
 
-カスタマイズ時はこのファイル群をベースに改変する。認証フロー（TOKEN_KEY、redirectLogin、API_BASE）は必ず維持する。
+カスタマイズ時はこのファイル群をベースに改変する。認証フロー（TOKEN_KEY、redirectLogin、API_BASE）は必ず維持する。output は必ず `labels` + `content` 形式で扱う。
