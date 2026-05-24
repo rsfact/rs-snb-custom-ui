@@ -1,0 +1,210 @@
+# Scanners Base カスタムサブUI テンプレート
+
+Scanners Base（以下 SNB）のメイン画面からリンクされる、**カスタム閲覧・編集UI** を作るためのテンプレートリポジトリです。
+
+非エンジニアの方が、普段お使いの AI（Gemini など）と対話しながら画面を作り、**ローカルで試しながら調整**し、完成したコードをエンジニアに渡します。デプロイ作業自体はエンジニアが行います。
+
+## サブシステムとは
+
+SNB 本体でアップロード・読み取りされたドキュメントを、**admin 権限の人が配布・閲覧用 UI として使える仕組み**です。
+
+- SNB メイン画面（ボード）で Rule を作り、Task にドキュメントをアップロードする
+- 各 Task から、このリポジトリで作ったカスタム UI へ遷移する
+- user ロールの人は自分の Task だけ、admin はすべての Task を閲覧できる
+
+```
+SNB メイン画面（ボード）
+  └─ Rule を作成 → Task を作成 → ドキュメントをアップロード
+       └─ タスクのクエリをコピー
+            └─ カスタムサブUI（このリポジトリで作った HTML）
+                 ?board_id=xxx&task_id=yyy
+```
+
+## このリポジトリで作るもの
+
+| ファイル | 役割 |
+|---|---|
+| `frontend/index.html` | メイン画面（タスクの読み取り結果を表示） |
+| `frontend/login.html` | ログイン画面 |
+| `AGENT.md` | AI が読む設計書・API仕様・作業手順 |
+| `README.md` | 人間向けの説明（このファイル） |
+
+---
+
+## 作業の流れ（非エンジニア向け）
+
+デプロイはエンジニアが行います。あなたが行うのは、**AI と対話して HTML を作り、ローカルで試す**ところまでです。
+
+### 1. AI と対話して HTML を作る
+
+1. この GitHub リポジトリを、普段お使いの AI に渡す
+2. AI が最初に **いまお使いのメインシステム（Scanners Base）の URL** を聞いてくるので、教える  
+   例: `https://your-company.example.com`（ブラウザのアドレスバーに表示されている URL）
+3. URL を伝えたあと、「こんな画面が作りたい」と対話する
+   - UI のタイトル、色、表示したい項目
+   - 閲覧だけでよいか、編集も必要か
+4. AI が `index.html` と `login.html` のコードを出力してくれる（`SNB_ORIGIN` には教えた URL が入っている）
+
+### 2. ローカルに貼り付ける
+
+1. このリポジトリを PC にダウンロードする（または AI の出力をそのまま使う）
+2. `frontend/index.html` をメモ帳などで開く（Windows なら右クリック → プログラムから開く → メモ帳）
+3. AI が出してくれたコードを **すべて** 貼り付けて保存する
+4. 同様に `frontend/login.html` も保存する
+
+### 3. SNB で Rule・Task を作り、試しにアップロードする
+
+1. SNB に admin アカウントでログインする
+2. **Rule** を作成する（読み取りルール・output の形式を決める）
+3. **Task** を作成する
+4. 試し用のドキュメント（画像・PDF など）をアップロードする
+5. 読み取り結果（output）が返ってくるまで待つ
+
+### 4. クエリをコピーして、ローカルで確認する
+
+1. SNB のボード画面で、作成した Task のカード左上にマウスを乗せる
+2. 表示される **クエリ**（`?board_id=...&task_id=...`）をクリックしてコピーする
+3. PC 上の `frontend/index.html` をブラウザで開く
+4. アドレスバーの末尾に、コピーしたクエリを貼り付けて Enter
+
+   例:
+
+   ```
+   file:///C:/Users/あなた/Downloads/scanners-base-sub-ui/frontend/index.html?board_id=abc&task_id=xyz
+   ```
+
+5. ログイン画面が出たら、SNB と同じメールアドレス・パスワードでログインする
+6. 読み取り結果が画面に表示される
+
+> **ローカル確認の前提**  
+> PC から直接 `index.html` を開く場合、HTML 内の `SNB_ORIGIN` にメインシステムの URL が入っている必要があります。  
+> AI は対話の最初に URL を聞くので、教えておけばコードに自動で設定されます。
+
+### 5. 結果を見て、UI を調整する
+
+1. 表示内容・レイアウト・色などを確認する
+2. 直したい点を AI に伝える（「氏名を大きく」「金額順に並べたい」など）
+3. AI が出した新しいコードを、再びメモ帳で `index.html` に貼り付ける
+4. ブラウザを更新（F5）して確認する
+5. 満足いくまで **4 → 5** を繰り返す
+
+### 6. 完成したコードをエンジニアに共有する
+
+1. 完成した `index.html` と `login.html` をエンジニアに渡す
+2. エンジニアが SNB サーバーに配置し、Rule の遷移先 URL を設定する
+3. 以降、SNB の Task からその UI へ直接遷移できるようになる
+
+---
+
+## ローカル確認のコツ
+
+| 項目 | 説明 |
+|---|---|
+| `SNB_ORIGIN` | HTML 先頭付近にある SNB の URL。ローカル確認時のみ設定する |
+| クエリ | `?board_id=xxx&task_id=yyy` の形式。Task カードからコピーする |
+| ログイン | SNB と同じアカウント。一度ログインすれば、同じブラウザでは再ログイン不要 |
+| 更新 | コードを貼り替えたら、ブラウザで F5（再読み込み）する |
+
+うまく表示されないとき:
+
+- `SNB_ORIGIN` が SNB の URL と一致しているか確認する
+- クエリがアドレスバーに付いているか確認する
+- admin アカウントでログインしているか確認する（他人の Task を見る場合）
+
+---
+
+## 配置先 URL（エンジニア向け参考）
+
+完成後、エンジニアが SNB サーバー上の次のパスに配置します。
+
+```
+{BASE_URL}/snb/custom/{folder_name}/index.html
+{BASE_URL}/snb/custom/{folder_name}/login.html
+```
+
+Rule の遷移先 URL（ext_url）の例:
+
+```
+{BASE_URL}/snb/custom/{folder_name}/index.html
+```
+
+Task クリック時の遷移先:
+
+```
+{BASE_URL}/snb/custom/{folder_name}/index.html?board_id={board_id}&task_id={task_id}
+```
+
+---
+
+## 認証
+
+- ログインアカウントは **SNB メインシステムと共通**
+- ログイン成功後、JWT トークンをブラウザの `localStorage` に保存する
+- API 呼び出し時は `Authorization: Bearer {token}` ヘッダーを付与する
+
+## アクセス制御
+
+| 操作 | user ロール | admin ロール |
+|---|---|---|
+| GET（タスク・画像の閲覧） | 自分のタスクのみ | すべて |
+| POST / PATCH / DELETE | 不可 | 可 |
+
+403 が返った場合、UI 側では「このURLからはご覧いただけません。」と表示します。
+
+## デフォルトサンプル UI の動作
+
+`frontend/` に入っているのは **GET のみ** のプレーンなサンプルです。
+
+- URL パラメータ `board_id` / `task_id` からタスクを取得
+- 画像一覧をテーブル表示
+- 行クリックでモーダルに読み取り結果を表示
+- CSV 出力
+- 未ログイン時は `login.html` へリダイレクト
+
+用途例:
+
+- **user 向け**: 名刺一覧の閲覧
+- **admin 向け**: 同じ UI でも admin は全タスクを閲覧可能
+
+## API エンドポイント（参考）
+
+API のベース URL は `{BASE_URL}/snb/api` です。
+
+| 操作 | メソッド | パス |
+|---|---|---|
+| ログイン | POST | `/snb/api/auth/login` |
+| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` |
+| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` |
+| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` |
+| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` |
+
+## output スキーマ
+
+読み取り結果 `output` は UI ごとに自由に設計できます。
+
+**形式 A（labels + content）**
+
+```json
+{
+  "labels": { "name": "氏名", "company": "会社名" },
+  "content": { "name": "山田太郎", "company": "株式会社ABC" }
+}
+```
+
+**形式 B（フラット）**
+
+```json
+{
+  "name": "山田太郎",
+  "company": "株式会社ABC"
+}
+```
+
+Rule 作成時に output の形式を決め、AI との対話でも同じ形式を伝えてください。
+
+## 技術スタック
+
+- HTML（単一ファイル、ビルド不要）
+- Tailwind CSS（CDN）
+- Font Awesome（CDN）
+- Alpine.js（CDN、編集 UI など複雑な画面で使用可）

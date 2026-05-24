@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>サンプルビュー</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/rsfact/assets/main/favicon.ico" type="image/x-icon" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --color-bg: #fafafa;
+      --color-black: #333;
+      --color-primary: #799bf9;
+      --color-accent: #ffa775;
+      --color-danger: #ff5151;
+    }
+    body {
+      margin: 0;
+      background-color: #f8fafc;
+      background-image:
+        linear-gradient(to bottom, transparent 31px, rgba(99, 102, 241, 0.1) 31px, rgba(99, 102, 241, 0.1) 32px),
+        radial-gradient(circle, rgba(99, 102, 241, 0.14) 0.9px, transparent 1px);
+      background-size: 100% 32px, 24px 32px;
+      background-position: 0 0, 0 31px;
+      color: var(--color-black);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4 py-6">
+  <div class="w-full max-w-md rounded-2xl bg-transparent p-3 md:p-5">
+    <div class="text-center mb-5">
+      <i class="fa-solid fa-table-list text-[var(--color-primary)]"></i>
+      <h1 class="font-bold text-xl mt-1">サンプルビュー</h1>
+      <p class="text-xs text-gray-500 mt-1">ようこそ</p>
+    </div>
+
+    <form id="loginForm" class="space-y-3">
+      <div class="relative">
+        <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input
+          id="email"
+          type="email"
+          required
+          placeholder="メールアドレス"
+          class="w-full pl-10 pr-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-indigo-300 text-sm"
+        />
+      </div>
+
+      <div class="relative">
+        <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input
+          id="password"
+          type="password"
+          required
+          placeholder="パスワード"
+          class="w-full pl-10 pr-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-indigo-300 text-sm"
+        />
+      </div>
+
+      <button
+        id="submitButton"
+        type="submit"
+        class="w-full px-4 py-2.5 rounded-xl text-white font-semibold transition"
+        style="background: var(--color-primary);"
+      >
+        ログイン
+      </button>
+    </form>
+
+    <p id="errorMessage" class="hidden text-xs text-[var(--color-danger)] mt-3"></p>
+  </div>
+
+  <script>
+    // AI が対話の最初にユーザーから聞いたメインシステムの URL（例: "https://example.com"）
+    // サーバーに配置して使うときは空文字のままでよい
+    const SNB_ORIGIN = "";
+    const API_BASE = SNB_ORIGIN
+      ? `${SNB_ORIGIN.replace(/\/+$/, "")}/snb/api`
+      : new URL("/snb/api", window.location.origin).toString();
+    const TOKEN_KEY = "snb_customer_token";
+    const params = new URLSearchParams(window.location.search);
+    const boardId = params.get("board_id") || "";
+    const taskId = params.get("task_id") || "";
+
+    const form = document.getElementById("loginForm");
+    const button = document.getElementById("submitButton");
+    const errorMessage = document.getElementById("errorMessage");
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+      errorMessage.classList.remove("hidden");
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorMessage.classList.add("hidden");
+      button.disabled = true;
+      button.textContent = "ログイン中...";
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email: document.getElementById("email").value.trim(),
+            password: document.getElementById("password").value
+          })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success || !json.data?.token) {
+          throw new Error("login failed");
+        }
+
+        localStorage.setItem(TOKEN_KEY, json.data.token);
+        if (json.data.user?.name) localStorage.setItem("snb_customer_name", json.data.user.name);
+
+        const next = new URL("./index.html", window.location.href);
+        if (boardId) next.searchParams.set("board_id", boardId);
+        if (taskId) next.searchParams.set("task_id", taskId);
+        window.location.href = next.toString();
+      } catch {
+        showError("ログインに失敗しました。メールアドレスとパスワードを確認してください。");
+      } finally {
+        button.disabled = false;
+        button.textContent = "ログイン";
+      }
+    });
+  </script>
+</body>
+</html>
