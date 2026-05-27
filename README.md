@@ -4,6 +4,9 @@ Scanners Base（以下 SNB）のメイン画面からリンクされる、**カ�
 
 非エンジニアの方が、**Claude Code**（標準）や **Cursor** など、**GitHub 上のこのリポジトリを読める AI** と対話しながら画面を作り、**ローカルで試しながら調整**し、完成したコードをエンジニアに渡します。デプロイ作業自体はエンジニアが行います。
 
+- **`AGENT.md`** … AI に渡す**対話用プロンプト**（`sample/` 相当の画面をユーザーと一緒に作る前提で、進め方・API・制約を書く）
+- **`README.md`** … 利用者向けの手順に加え、**このファイルの後半**でエンジニア向けに API・認証・配置をまとめる
+
 > **Gemini などは本手順の対象外です。** AI にリポジトリを丸ごと貼り付ける必要はなく、`AGENT.md` や `sample/` は GitHub から直接読ませられます。
 
 ## サブシステムとは
@@ -28,11 +31,11 @@ SNB メイン画面（ボード）
 
 | ファイル | 役割 |
 |---|---|
-| `sample/index.html` | メイン画面のサンプル（タスクの読み取り結果を表示） |
-| `sample/login.html` | ログイン画面のサンプル |
+| `sample/index.html` | メイン画面のサンプル（フォルダ・検索・一覧・詳細編集・削除・アップロード・CSV など、API を組み合わせたリファレンス実装） |
+| `sample/login.html` | ログイン画面のサンプル（メイン UI と同じトークン保存規約） |
 | `dify.yml` | Dify ワークフローのテンプレート（Dify に import し、**Dify 上で** 読み取り項目に合わせて編集） |
-| `AGENT.md` | AI が読む設計書・API仕様・作業手順（**Claude Code / Cursor 向け**） |
-| `README.md` | 人間向けの説明（このファイル） |
+| `AGENT.md` | **AI に渡す対話用プロンプト**（作業の進め方・API の扱い・制約。ユーザーと一緒に `sample/` 相当の画面を作る前提） |
+| `README.md` | 人間向けの手順と、このファイル下部の **エンジニア向け仕様（API・認証・配置）** のまとめ |
 
 完成時の成果物は **`index.html`** と **`login.html`**（ローカル保存、または `sample/` を更新）。
 
@@ -190,7 +193,7 @@ Task クリック時の遷移先:
 ## 認証
 
 - ログインアカウントは **SNB メインシステムと共通**
-- ログイン成功後、JWT トークンをブラウザの `localStorage` に保存する
+- ログイン成功後、JWT トークンをブラウザの `localStorage` に保存する（メイン UI との互換のため **`snb_customer_token` と `snb_token` の両方**への保存を推奨。表示名は `snb_customer_name` / `snb_user_name`）
 - API 呼び出し時は `Authorization: Bearer {token}` ヘッダーを付与する
 
 ## アクセス制御
@@ -204,21 +207,20 @@ Task クリック時の遷移先:
 
 403 が返った場合、UI 側では「このURLからはご覧いただけません。」と表示します。
 
-## デフォルトサンプル UI の動作
+## サンプル UI の動作（`sample/`）
 
-`sample/` に入っているのは、**最小構成のプレーンなサンプル**です（編集・削除 UI なし）。
+`sample/index.html` は、**単一タスクだけでなくボード全体**を想定したリファレンスです。
 
-- URL パラメータ `board_id` / `task_id` からタスクを取得
-- 画像一覧をテーブル表示
-- 行クリックでモーダルに読み取り結果を表示
-- CSV 出力
-- 未ログイン時は `login.html` へリダイレクト
+- クエリ `board_id`（必須）でボードを特定。`task_id` があればそのフォルダ（タスク）を初期選択
+- `POST .../boards/{board_id}/search` でフォルダ一覧、`POST .../tasks/search` で画像の検索・一覧
+- フォルダの作成・名前変更・削除、画像の詳細表示・項目編集・削除・アップロード、CSV 出力
+- 未ログイン時は `login.html` へ（`board_id` は必須）
 
-AI との対話では、作りたい機能をそのまま伝えればよい（編集・削除・並べ替えなど）。用途のカテゴリ分けは不要。
+AI（`AGENT.md`）との対話では、必要な機能だけに絞る・拡張するなど、`sample/` を出発点にしてよい。
 
-## output スキーマ
+## output（読み取り結果）
 
-読み取り結果 `output` は **`labels` + `content` 形式のみ** 使用します。この形式は固定で、変更できません。変えられるのは中の項目名・ラベル・値だけです。
+Dify では **`labels` + `content`** 形式を推奨する（`dify.yml` もこの前提）。
 
 ```json
 {
@@ -227,27 +229,30 @@ AI との対話では、作りたい機能をそのまま伝えればよい（�
 }
 ```
 
-- `labels` … 各項目の日本語ラベル
-- `content` … 読み取り結果の値
-
-Rule 作成時にこの形式で output を決め、AI との対話でも同じ形式を伝えてください。
+API 上は歴史的経緯により **フラットなオブジェクト**だけが返る場合もある。カスタム UI では **`sample/index.html` と同様に正規化**（`content` があればそこから、なければトップレベルのキーを項目として扱う）して表示・編集すること。
 
 ## 外部 API
 
 外部サービスとの連携（例: 登録番号から会社名を取得）が必要なら、HTML 内に設定値を直接書き込みます。
 
-## API エンドポイント（参考）
+## API エンドポイント（エンジニア向け）
 
-API のベース URL は `{BASE_URL}/snb/api` です。
+API のベース URL は `{BASE_URL}/snb/api` です。認証以外は **`/v1`** 配下です。
 
 | 操作 | メソッド | パス | 備考 |
 |---|---|---|---|
-| ログイン | POST | `/snb/api/auth/login` | 共通（**`/v1` は付けない**） |
-| タスク取得 | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | user / admin 共通 |
-| タスク一覧 | POST | `/snb/api/v1/boards/{board_id}/tasks/search` | user は自分の分のみ |
-| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | user / admin 共通 |
-| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | user / admin 共通 |
-| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` | user / admin 共通 |
+| ログイン | POST | `/snb/api/auth/login` | **`/v1` は付けない** |
+| ボード配下タスク（フォルダ）一覧 | POST | `/snb/api/v1/boards/{board_id}/search` | ページング・JSON ボディ（`sample` は `page` / `size` / `is_include_archived` 等） |
+| 画像検索（タスク横断・フォルダ絞り込み） | POST | `/snb/api/v1/boards/{board_id}/tasks/search` | `task_id` / `keyword` / `page` / `size` / `sort` 等 |
+| タスク取得（1フォルダの詳細＋画像） | GET | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | 一覧が不要な画面向け |
+| タスク（フォルダ）作成 | POST | `/snb/api/v1/boards/{board_id}/tasks/` | JSON: `name` 等 |
+| タスク更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | 例: フォルダ名変更 |
+| タスク削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}` | |
+| 画像更新 | PATCH | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | JSON: `output` / `is_done` 等 |
+| 画像削除 | DELETE | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs/{img_id}` | |
+| 画像アップロード | POST | `/snb/api/v1/boards/{board_id}/tasks/{task_id}/imgs` | `multipart/form-data`、フィールド名 `img` |
+
+**トークン保存（メイン UI との互換）**: カスタム UI では `localStorage` の `snb_customer_token` と `snb_token` の両方へ書き込む実装を推奨（読み取りもどちらかで試す）。表示名は `snb_customer_name` / `snb_user_name`。
 
 ## 技術スタック
 
