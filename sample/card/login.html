@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>プロンプトリポジトリ</title>
-  <link rel="icon" href="https://raw.githubusercontent.com/rsfact/assets/main/favicon.ico" type="image/x-icon" />
+  <title>Sansan Clone</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%232563eb' d='M0 32v448c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H32C14.3 0 0 14.3 0 32zm80 96a80 80 0 1 1 0 160 80 80 0 1 1 0-160zm240 96c26.5 0 48 21.5 48 48v48H32v-48c0-26.5 21.5-48 48-48h240z'/%3E%3C/svg%3E" type="image/svg+xml" />
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -31,8 +31,8 @@
 <body class="min-h-screen flex items-center justify-center px-4 py-6">
   <div class="w-full max-w-md rounded-2xl bg-transparent p-3 md:p-5">
     <div class="text-center mb-5">
-      <i class="fa-solid fa-id-card text-[var(--color-primary)]"></i>
-      <h1 class="font-bold text-xl mt-1">プロンプトリポジトリ</h1>
+      <i class="fa-solid fa-print text-[var(--color-primary)]"></i>
+      <h1 class="font-bold text-xl mt-1">Sansan Clone</h1>
       <p class="text-xs text-gray-500 mt-1">ようこそ</p>
     </div>
 
@@ -73,10 +73,12 @@
   </div>
 
   <script>
-    const SNB_ORIGIN = "";
-    const API_BASE = SNB_ORIGIN
-      ? `${SNB_ORIGIN.replace(/\/+$/, "")}/snb/api`
-      : new URL("/snb/api", window.location.origin).toString();
+    const API_BASE = new URL(
+      "/snb/api",
+      location.protocol === "file:" || location.origin === "null"
+        ? "{BASE_URL}"
+        : location.origin
+    ).toString().replace(/\/$/, "");
     const TOKEN_KEYS = ["snb_customer_token", "snb_token"];
     const NAME_KEYS = ["snb_customer_name", "snb_user_name"];
     const params = new URLSearchParams(window.location.search);
@@ -86,6 +88,14 @@
     const form = document.getElementById("loginForm");
     const button = document.getElementById("submitButton");
     const errorMessage = document.getElementById("errorMessage");
+
+    function readToken() {
+      for (const key of TOKEN_KEYS) {
+        const token = localStorage.getItem(key);
+        if (token) return token;
+      }
+      return "";
+    }
 
     function saveToken(token) {
       for (const key of TOKEN_KEYS) localStorage.setItem(key, token);
@@ -104,7 +114,6 @@
     if (!boardId) {
       showError("board_id が URL に含まれていません。管理者に共有されたリンクから開いてください。");
     }
-
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!boardId) {
@@ -135,6 +144,10 @@
         saveToken(json.data.token);
         saveUserName(json.data.user?.name);
 
+        if (!boardId) {
+          showError("board_id が URL に含まれていません。");
+          return;
+        }
         const next = new URL("./index.html", window.location.href);
         next.searchParams.set("board_id", boardId);
         if (taskId) next.searchParams.set("task_id", taskId);
