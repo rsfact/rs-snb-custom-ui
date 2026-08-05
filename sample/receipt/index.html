@@ -127,12 +127,23 @@
 
         .toast-container {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
+            top: 0.75rem;
+            right: 0.75rem;
             z-index: 50;
             pointer-events: none;
-            max-width: 24rem;
-            width: 100%;
+            max-width: 14rem;
+            width: max-content;
+        }
+        .toast-item {
+            padding: 0.375rem 0.625rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+            font-size: 0.6875rem;
+            line-height: 1.25;
+            font-weight: 500;
+        }
+        .toast-item i {
+            font-size: 0.625rem;
         }
     </style>
 </head>
@@ -142,7 +153,7 @@
         <div class="max-w-7xl mx-auto px-4 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
             <div class="flex items-center space-x-2">
                 <i class="fa-solid fa-qrcode text-lg text-sky-500"></i>
-                <span class="font-bold tracking-tight leading-tight">領収書読み取りくん <span class="text-xs font-normal text-gray-400"></span></span>
+                <span class="font-bold tracking-tight leading-tight">領収書チェッカー <span class="text-xs font-normal text-gray-400"></span></span>
             </div>
             <div class="justify-self-center flex items-center justify-center gap-2 min-h-[2.5rem] flex-wrap px-2">
                 <div
@@ -155,24 +166,18 @@
                     </div>
                     <button
                         type="button"
-                        class="inline-flex items-center px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition disabled:opacity-60 whitespace-nowrap"
-                        :disabled="loading"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition disabled:opacity-60 whitespace-nowrap"
+                        title="読み取りを再実行"
+                        :disabled="loading || isCurrentImmutable()"
                         @click="resolveReadError"
                     >
-                        読み取りエラーを解消する
+                        <i class="fa-solid fa-rotate-right text-xs" aria-hidden="true"></i>
+                        <span>再アップロード</span>
                     </button>
                 </div>
             </div>
             <div class="justify-self-end">
                 <div class="flex items-center gap-3">
-                    <a
-                        :href="mainAppTaskUrl()"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition"
-                        title="Scanners Base のフォルダ画面へ"
-                    >
-                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                        <span>一覧へ</span>
-                    </a>
                     <div class="flex items-center space-x-1 text-gray-600 text-sm max-w-[12rem] truncate" :title="taskName">
                         <span x-text="taskName || 'タスクが見つかりません'"></span>
                         <i class="fa-solid fa-folder-open text-xs text-gray-400 shrink-0"></i>
@@ -205,48 +210,65 @@
             </div>
         </div>
 
-        <div class="receipt-edit-grid" x-show="currentStep === 'edit'" x-cloak>
+        <div
+            x-show="loadError"
+            class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900"
+            x-cloak
+        >
+            <p class="font-semibold" x-text="loadError"></p>
+            <p class="mt-2 text-xs text-amber-800/90">ログインアカウントが違います。</p>
+            <a
+                :href="mainAppTaskUrl()"
+                class="mt-4 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 bg-white text-indigo-700 text-xs font-semibold hover:bg-indigo-50 transition"
+            >
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                一覧へ戻る
+            </a>
+        </div>
+
+        <div class="receipt-edit-grid" x-show="currentStep === 'edit' && currentImg()" x-cloak>
             
             <div class="min-h-0">
                 <div class="receipt-preview-card bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                     <div
                         class="receipt-preview-body flex items-center justify-center p-2"
                         :class="isCurrentImgFailed() ? 'bg-red-50/40' : 'bg-gray-50'"
+                        x-ref="previewScroll"
                     >
                         <div class="absolute top-3 left-3 right-3 z-20 flex items-start justify-between gap-2 pointer-events-none">
                             <button
                                 type="button"
                                 class="pointer-events-auto w-9 h-9 rounded-lg border border-red-200 bg-white text-red-500 shadow-sm hover:bg-red-50 hover:border-red-300 transition inline-flex items-center justify-center disabled:opacity-40"
                                 title="この画像を削除"
-                                :disabled="loading"
+                                :disabled="loading || isCurrentImmutable()"
                                 @click="requestDeleteImg"
                             >
                                 <i class="fa-regular fa-trash-can text-sm"></i>
                             </button>
                             <span
-                                x-show="currentImg()?.display_id != null"
+                                x-show="currentDisplayId() != null"
                                 class="inline-flex items-center px-2.5 py-1 rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 text-sm font-bold shadow-sm"
-                                x-text="'# ' + currentImg().display_id"
+                                x-text="currentDisplayLabel()"
                                 x-cloak
                             ></span>
                         </div>
                         <div x-show="isPreviewLoading" class="absolute inset-0 z-10 bg-white/75 backdrop-blur-[1px] flex items-center justify-center" x-cloak>
                             <div class="animate-spin rounded-full h-9 w-9 border-4 border-t-transparent" style="border-color: #38bdf8; border-top-color: transparent;"></div>
                         </div>
-                        <template x-if="currentImg()?.url && isPdfUrl(currentImg().url)">
+                        <template x-if="currentPreviewSrc() && isPdfUrl(currentImg()?.url)">
                             <iframe
-                                :src="currentImg().url"
+                                :src="currentPreviewSrc()"
                                 class="w-full h-full rounded-lg border border-gray-100 bg-white"
                                 title="PDF preview"
                                 @load="handlePreviewLoaded"
                             ></iframe>
                         </template>
-                        <template x-if="currentImg()?.url && !isPdfUrl(currentImg().url)">
+                        <template x-if="currentPreviewSrc() && !isPdfUrl(currentImg()?.url)">
                             <img
                                 x-ref="previewImage"
-                                :src="currentImg().url"
+                                :src="currentPreviewSrc()"
                                 @load="handlePreviewLoaded"
-                                @error="handlePreviewLoaded"
+                                @error="onPreviewMediaError($event)"
                                 @wheel="handleImageZoomWheel($event)"
                                 @pointerdown="onImagePointerDown($event)"
                                 @pointermove="onImagePointerMove($event)"
@@ -261,9 +283,9 @@
                         </template>
                         <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                             <div class="text-sm font-mono text-gray-700 whitespace-nowrap bg-white/90 border border-gray-200 rounded-lg px-3 py-1 shadow-sm">
-                                <span class="font-bold text-gray-900" x-text="currentIndex + 1"></span>
+                                <span class="font-bold text-gray-900" x-text="editNavPosition()"></span>
                                 <span class="text-gray-300 mx-1">/</span>
-                                <span x-text="imgs.length"></span>
+                                <span x-text="editNavTotal()"></span>
                             </div>
                         </div>
                     </div>
@@ -277,24 +299,32 @@
                     class="space-y-4 receipt-form-scroll pr-1 custom-scroll"
                     @wheel="onFormPanelWheel($event)"
                 >
+                    <p
+                        x-show="isCurrentImmutable()"
+                        class="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-xl px-3 py-2"
+                        x-cloak
+                    >
+                        チェック済のドキュメントは変更・削除できません
+                    </p>
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">発行日</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1" x-text="fieldLabel('issued_on')"></label>
                         <input
                             type="date"
                             x-ref="firstField"
-                            x-model="issuedDateInput"
-                            @change="onIssuedDateChange"
-                            @input="onIssuedDateChange"
-                            class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base"
+                            x-model="issuedOnInput"
+                            @change="onIssuedOnChange"
+                            @input="onIssuedOnChange"
+                            :disabled="isCurrentImmutable()"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base disabled:bg-gray-50 disabled:text-gray-500"
                         >
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">登録番号</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-1" x-text="fieldLabel('invoice_number')"></label>
                         <div class="flex gap-2">
                             <div class="relative flex-1">
                                 <span class="absolute left-3 top-2.5 text-gray-400 font-mono text-base">T</span>
-                                <input type="text" x-model="rawInvoiceNumber" @input="handleInvoiceInput" placeholder="13桁の番号を入力" class="w-full pl-7 pr-8 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base font-mono tracking-wider">
+                                <input type="text" x-model="rawInvoiceNumber" @input="handleInvoiceInput" placeholder="13桁の番号を入力" :disabled="isCurrentImmutable()" class="w-full pl-7 pr-8 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base font-mono tracking-wider disabled:bg-gray-50 disabled:text-gray-500">
                                 <div class="absolute right-3 top-2.5" x-show="invoiceValidating">
                                     <i class="fa-solid fa-spinner animate-spin text-xs text-blue-500"></i>
                                 </div>
@@ -312,7 +342,7 @@
                             <div class="flex items-center gap-2 shrink-0">
                                 <button
                                     type="button"
-                                    x-show="fetchedCompanyName"
+                                    x-show="fetchedCompanyName && !isCurrentImmutable()"
                                     @click="applyFetchedCompanyName"
                                     class="px-2 py-0.5 rounded border border-blue-200 text-blue-600 text-xs hover:bg-blue-50 transition shrink-0"
                                 >
@@ -323,26 +353,25 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">発行元</label>
-                        <input type="text" x-model="output.client_name" class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base">
+                        <label class="block text-sm font-bold text-gray-700 mb-1" x-text="fieldLabel('client_name')"></label>
+                        <input type="text" x-model="output.client_name" :disabled="isCurrentImmutable()" class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base disabled:bg-gray-50 disabled:text-gray-500">
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">金額</label>
-                        <input type="number" x-model.number="output.amount" class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base font-mono">
+                        <label class="block text-sm font-bold text-gray-700 mb-1" x-text="fieldLabel('amount')"></label>
+                        <input type="number" x-model.number="output.amount" :disabled="isCurrentImmutable()" class="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-sky-400 text-base font-mono disabled:bg-gray-50 disabled:text-gray-500">
                     </div>
 
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">摘要</label>
-                        <textarea x-model="output.comment" rows="3" class="w-full px-3 py-2 border border-blue-400 rounded-xl focus:outline-none text-base"></textarea>
+                        <label class="block text-sm font-bold text-gray-700 mb-1" x-text="fieldLabel('comment')"></label>
+                        <textarea x-model="output.comment" rows="3" :disabled="isCurrentImmutable()" class="w-full px-3 py-2 border border-blue-400 rounded-xl focus:outline-none text-base disabled:bg-gray-50 disabled:text-gray-500 disabled:border-gray-200"></textarea>
                     </div>
                 </div>
 
                 <div class="pt-4 mt-4 border-t border-gray-100 flex items-center justify-end shrink-0 flex-shrink-0">
                     <div class="flex items-center gap-2">
-                        <button @click="prevImg" :disabled="currentIndex === 0" class="bg-emerald-100 hover:bg-emerald-200 disabled:opacity-40 disabled:hover:bg-emerald-100 text-emerald-800 py-2.5 px-4 rounded-xl font-medium text-sm transition shadow-sm min-w-[120px] whitespace-nowrap flex items-center justify-center gap-1.5">
-                            <span>前へ</span>
-                            <span class="text-[9px] opacity-80 font-normal bg-white/20 px-1 py-0.5 rounded shrink-0">Ctrl + Enter</span>
+                        <button @click="prevImg" :disabled="isPrevDisabled()" class="bg-emerald-100 hover:bg-emerald-200 disabled:opacity-40 disabled:hover:bg-emerald-100 text-emerald-800 py-2.5 px-4 rounded-xl font-medium text-sm transition shadow-sm min-w-[120px] whitespace-nowrap flex items-center justify-center">
+                            前へ
                         </button>
 
                         <button @click="saveAndNext" class="bg-[#1c92ff] hover:bg-blue-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm transition shadow-sm flex items-center justify-center gap-1.5 min-w-[120px] whitespace-nowrap">
@@ -360,50 +389,44 @@
             </div>
         </div>
 
-        <div x-show="currentStep === 'export'" class="max-w-4xl mx-auto w-full flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scroll space-y-6 pr-1" x-cloak>
+        <div x-show="currentStep === 'export'" class="max-w-4xl mx-auto w-full flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scroll space-y-4 pr-1" x-cloak>
+            <button @click="returnToEdit()" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
+                <i class="fa-solid fa-arrow-left mr-1"></i> 編集に戻る
+            </button>
+
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-                <h2 class="text-xl font-bold tracking-tight">データ確認</h2>
-                
+                <div class="flex justify-center">
+                    <button @click="processExport" class="bg-[#1c92ff] hover:bg-blue-600 text-white py-4 px-10 rounded-2xl font-bold text-base shadow-sm flex items-center gap-2 transition">
+                        <i class="fa-solid fa-download"></i>弥生会計用にエクスポート
+                    </button>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
-                                <th class="p-3">#</th>
-                                <th class="p-3">日付</th>
-                                <th class="p-3">支払先</th>
-                                <th class="p-3">金額</th>
-                                <th class="p-3">摘要</th>
-                                <th class="p-3">状態</th>
+                                <th class="p-3"></th>
+                                <th class="p-3" x-text="exportFieldLabel('issued_on')"></th>
+                                <th class="p-3" x-text="exportFieldLabel('client_name')"></th>
+                                <th class="p-3" x-text="exportFieldLabel('amount')"></th>
+                                <th class="p-3" x-text="exportFieldLabel('comment')"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="img in imgs" :key="img.id">
-                                <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition" :class="img.is_failed ? 'bg-red-50/50' : ''">
+                            <template x-for="(img, index) in sortedAllImgs()" :key="img.id">
+                                <tr
+                                    class="border-b border-gray-50 hover:bg-sky-50/60 transition cursor-pointer"
+                                    :class="img.is_failed ? 'bg-red-50/50' : ''"
+                                    @click="goToEditFromExport(index)"
+                                >
                                     <td class="p-3 font-mono text-indigo-700 font-semibold" x-text="img.display_id != null ? ('#' + img.display_id) : '—'"></td>
-                                    <td class="p-3 font-mono text-gray-600" x-text="getOutputContent(img.output).issued_date ?? ''"></td>
+                                    <td class="p-3 font-mono text-gray-600" x-text="formatIssuedOn(getOutputContent(img.output).issued_on)"></td>
                                     <td class="p-3 font-medium text-gray-800" x-text="getOutputContent(img.output).client_name ?? ''"></td>
                                     <td class="p-3 font-mono text-gray-700" x-text="getOutputContent(img.output).amount ?? ''"></td>
                                     <td class="p-3 text-gray-500 max-w-xs truncate" x-text="getOutputContent(img.output).comment || ''"></td>
-                                    <td class="p-3 text-xs">
-                                        <span x-show="img.is_failed" class="text-red-600 font-semibold">読取エラー</span>
-                                        <span x-show="!img.is_failed && img.is_done" class="text-lime-700 font-semibold">確認済</span>
-                                        <span x-show="!img.is_failed && !img.is_done" class="text-gray-400">未確認</span>
-                                    </td>
                                 </tr>
                             </template>
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-                <div class="pt-2 flex flex-col items-center gap-4">
-                    <button @click="currentStep = 'edit'" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> 編集に戻る
-                    </button>
-                    <button @click="processExport" class="bg-[#1c92ff] hover:bg-blue-600 text-white py-4 px-10 rounded-2xl font-bold text-base shadow-sm flex items-center gap-2 transition">
-                        <i class="fa-solid fa-download"></i> 弥生会計用にエクスポート
-                    </button>
                 </div>
             </div>
         </div>
@@ -426,13 +449,11 @@
         </div>
     </div>
 
-    <div class="toast-container space-y-2">
+    <div class="toast-container space-y-1.5">
         <template x-for="toast in toasts" :key="toast.id">
-            <div x-transition class="pointer-events-auto p-4 rounded-xl shadow-lg border text-xs font-medium flex items-center justify-between bg-gray-900 text-white border-transparent">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-circle-check text-green-400"></i>
-                    <span x-text="toast.msg"></span>
-                </div>
+            <div x-transition class="toast-item pointer-events-auto flex items-center gap-1.5 bg-gray-900 text-white border border-transparent">
+                <i class="fa-solid fa-circle-check text-green-400 shrink-0"></i>
+                <span x-text="toast.msg"></span>
             </div>
         </template>
     </div>
@@ -443,6 +464,11 @@
             const TOKEN_KEY = 'snb_customer_token';
             return {
                 baseUrl: new URL('/snb/api', window.location.origin).toString(),
+                ntaApiUrl(number) {
+                    const url = new URL('/snb/receipt-api/api/nta', window.location.origin);
+                    url.searchParams.set('number', String(number || '').trim());
+                    return url.toString();
+                },
                 boardId: '',
                 taskId: '',
                 token: '',
@@ -451,21 +477,26 @@
                 loadingProgress: 0,
                 loadingWithProgress: false,
                 initialized: false,
+                loadError: '',
                 
-                currentStep: 'edit',
+                currentStep: 'list',
 
                 taskName: '',
-                issuedDateInput: '',
-                imgs: [],       
+                issuedOnInput: '',
+                allImgs: [],
+                imgs: [],
+                initialPendingTotal: 0,
+                pendingProgress: 1,
+                exportViewIndex: null,
                 currentIndex: 0,
                 deleteConfirmOpen: false,
                 
                 output: {
+                    issued_on: '',
+                    invoice_number: '',
                     client_name: '',
-                    amount: 0,
-                    comment: '',
-                    issued_date: '',
-                    invoice_number: ''
+                    amount: '',
+                    comment: ''
                 },
                 
                 rawInvoiceNumber: '',
@@ -474,6 +505,7 @@
                 invoiceValidating: false,
                 isPreviewLoading: false,
                 lastPreviewUrl: '',
+                previewSrcOverride: '',
                 imageZoomScale: 1,
                 imageZoomOrigin: { x: 50, y: 50 },
                 imagePanX: 0,
@@ -482,13 +514,14 @@
                 imageDragStart: null,
                 
                 toasts: [],
-                defaultLabels: {
-                    issued_date: '発行日',
+                defaultLabel: {
+                    issued_on: '発行日時',
                     invoice_number: '登録番号',
                     client_name: '発行元',
                     amount: '金額',
                     comment: '摘要'
                 },
+                currentLabel: {},
 
                 isJpegUrl(url) {
                     if (!url) return false;
@@ -507,6 +540,69 @@
                     this.imagePanY = 0;
                     this.imageDragging = false;
                     this.imageDragStart = null;
+                },
+
+                applyImageTransform() {
+                    const img = this.$refs.previewImage;
+                    if (!img) return;
+                    const o = this.imageZoomOrigin;
+                    img.style.transform = `translate(${this.imagePanX}px, ${this.imagePanY}px) scale(${this.imageZoomScale}); transform-origin: ${o.x}% ${o.y}%`;
+                },
+
+                clampImagePan() {
+                    const img = this.$refs.previewImage;
+                    const container = this.$refs.previewScroll;
+                    if (!img || !container) return;
+
+                    if (this.imageZoomScale <= 1) {
+                        this.imagePanX = 0;
+                        this.imagePanY = 0;
+                        this.imageZoomOrigin = { x: 50, y: 50 };
+                        this.applyImageTransform();
+                        return;
+                    }
+
+                    this.applyImageTransform();
+
+                    const eps = 0.5;
+                    const c = container.getBoundingClientRect();
+                    const i = img.getBoundingClientRect();
+                    if (c.width <= 0 || c.height <= 0) return;
+
+                    let dx = 0;
+                    let dy = 0;
+
+                    if (i.width <= c.width + eps) {
+                        dx = (c.left + c.width / 2) - (i.left + i.width / 2);
+                    } else if (i.left > c.left + eps) {
+                        dx = c.left - i.left;
+                    } else if (i.right < c.right - eps) {
+                        dx = c.right - i.right;
+                    }
+
+                    if (i.height <= c.height + eps) {
+                        dy = (c.top + c.height / 2) - (i.top + i.height / 2);
+                    } else if (i.top > c.top + eps) {
+                        dy = c.top - i.top;
+                    } else if (i.bottom < c.bottom - eps) {
+                        dy = c.bottom - i.bottom;
+                    }
+
+                    if (Math.abs(dx) > 0.01) this.imagePanX += dx;
+                    if (Math.abs(dy) > 0.01) this.imagePanY += dy;
+
+                    this.applyImageTransform();
+                },
+
+                afterImageZoom() {
+                    if (this.imageZoomScale <= 1) {
+                        this.imagePanX = 0;
+                        this.imagePanY = 0;
+                        this.imageZoomOrigin = { x: 50, y: 50 };
+                        this.applyImageTransform();
+                        return;
+                    }
+                    this.clampImagePan();
                 },
 
                 imagePanCursorClass() {
@@ -538,15 +634,18 @@
 
                 onImagePointerMove(event) {
                     if (!this.imageDragging || !this.imageDragStart) return;
+                    if (this.imageZoomScale <= 1) return;
                     event.preventDefault();
                     this.imagePanX = this.imageDragStart.panX + (event.clientX - this.imageDragStart.clientX);
                     this.imagePanY = this.imageDragStart.panY + (event.clientY - this.imageDragStart.clientY);
+                    this.clampImagePan();
                 },
 
                 onImagePointerUp(event) {
                     if (!this.imageDragging) return;
                     this.imageDragging = false;
                     this.imageDragStart = null;
+                    this.clampImagePan();
                     try {
                         if (event.currentTarget.releasePointerCapture) {
                             event.currentTarget.releasePointerCapture(event.pointerId);
@@ -558,10 +657,12 @@
 
                 zoomInImage() {
                     this.imageZoomScale = Math.min(5, Number((this.imageZoomScale + 0.2).toFixed(2)));
+                    this.afterImageZoom();
                 },
 
                 zoomOutImage() {
                     this.imageZoomScale = Math.max(0.4, Number((this.imageZoomScale - 0.2).toFixed(2)));
+                    this.afterImageZoom();
                 },
 
                 handleImageZoomWheel(event) {
@@ -615,10 +716,6 @@
                                 e.preventDefault();
                                 this.saveAndNext();
                             }
-                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                e.preventDefault();
-                                this.prevImg();
-                            }
                         }
                     });
                 },
@@ -651,6 +748,29 @@
                     return String(url).split('?')[0].toLowerCase().endsWith('.pdf');
                 },
 
+                imgContentUrl(img) {
+                    const board = String(this.boardId || '').trim();
+                    const task = String(this.taskId || '').trim();
+                    const imgId = String(img?.id || '').trim();
+                    if (!board || !task || !imgId) return '';
+                    return `${this.baseUrl}/v1/boards/${encodeURIComponent(board)}/tasks/${encodeURIComponent(task)}/imgs/${encodeURIComponent(imgId)}/content`;
+                },
+
+                currentPreviewSrc() {
+                    if (this.previewSrcOverride) return this.previewSrcOverride;
+                    const img = this.currentImg();
+                    return this.imgContentUrl(img) || String(img?.url || '').trim();
+                },
+
+                onPreviewMediaError(event) {
+                    this.handlePreviewLoaded();
+                    const fallback = String(this.currentImg()?.url || '').trim();
+                    const el = event?.target;
+                    if (!fallback || !el) return;
+                    if (el.src === fallback || this.previewSrcOverride === fallback) return;
+                    this.previewSrcOverride = fallback;
+                },
+
                 async apiJson(res) {
                     const json = await res.json().catch(() => ({}));
                     if (res.status === 401) {
@@ -669,25 +789,34 @@
 
                 getOutputContent(output) {
                     if (!output || typeof output !== 'object' || Array.isArray(output)) return {};
-                    if (Object.prototype.hasOwnProperty.call(output, 'content')) {
-                        const content = output.content;
-                        if (!content || typeof content !== 'object' || Array.isArray(content)) return {};
-                        return content;
-                    }
-                    const { labels: _labels, ...flat } = output;
-                    return flat;
+                    const content = output.content;
+                    if (!content || typeof content !== 'object' || Array.isArray(content)) return {};
+                    return content;
                 },
 
-                getOutputLabels(output) {
-                    if (!output || typeof output !== 'object' || Array.isArray(output)) return { ...this.defaultLabels };
-                    const labels = output.labels;
-                    if (!labels || typeof labels !== 'object' || Array.isArray(labels)) return { ...this.defaultLabels };
-                    return { ...this.defaultLabels, ...labels };
+                getOutputLabel(output) {
+                    if (!output || typeof output !== 'object' || Array.isArray(output)) {
+                        return { ...this.defaultLabel };
+                    }
+                    const raw = output.label ?? output.labels;
+                    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+                        return { ...this.defaultLabel };
+                    }
+                    return { ...this.defaultLabel, ...raw };
+                },
+
+                fieldLabel(key) {
+                    return this.currentLabel[key] || this.defaultLabel[key] || key;
+                },
+
+                exportFieldLabel(key) {
+                    const sample = this.sortedAllImgs()[0]?.output;
+                    return this.getOutputLabel(sample)[key] || this.defaultLabel[key] || key;
                 },
 
                 /** UI 側で並べ替え（API は触らない）: 読取エラー優先 → 金額降順 */
-                sortImgsForEditing() {
-                    this.imgs.sort((a, b) => {
+                sortImgs(list) {
+                    return [...list].sort((a, b) => {
                         const outA = this.getOutputContent(a.output);
                         const outB = this.getOutputContent(b.output);
                         const failedA = a?.is_failed === true ? 1 : 0;
@@ -695,61 +824,170 @@
                         if (failedA !== failedB) {
                             return failedB - failedA;
                         }
-                        const amtA = outA.amount !== undefined && outA.amount !== null ? Number(outA.amount) : 0;
-                        const amtB = outB.amount !== undefined && outB.amount !== null ? Number(outB.amount) : 0;
-                        return amtB - amtA;
+                        return this.amountValue(b) - this.amountValue(a);
                     });
                 },
 
+                amountValue(img) {
+                    const raw = this.getOutputContent(img?.output).amount;
+                    if (raw === undefined || raw === null || raw === '') return 0;
+                    const n = Number(raw);
+                    return Number.isFinite(n) ? n : 0;
+                },
+
+                sortImgsByAmount(list) {
+                    return [...list].sort((a, b) => this.amountValue(b) - this.amountValue(a));
+                },
+
+                sortedAllImgs() {
+                    return this.sortImgsByAmount(this.allImgs);
+                },
+
+                rebuildEditImgs() {
+                    const pending = this.allImgs.filter((img) => img.is_done !== true);
+                    this.imgs = this.sortImgs(pending);
+                    if (this.currentIndex >= this.imgs.length) {
+                        this.currentIndex = Math.max(0, this.imgs.length - 1);
+                    }
+                },
+
+                updateAllImgsEntry(imgId, patch) {
+                    const index = this.allImgs.findIndex((img) => img.id === imgId);
+                    if (index < 0) return;
+                    this.allImgs[index] = { ...this.allImgs[index], ...patch };
+                },
+
                 startEditing() {
-                    if (this.imgs.length === 0) return;
-                    this.sortImgsForEditing();
+                    this.exportViewIndex = null;
+                    this.rebuildEditImgs();
+                    if (this.imgs.length === 0) {
+                        if (this.allImgs.length > 0) this.goToExport();
+                        return;
+                    }
+                    this.syncPendingProgress();
                     this.currentIndex = 0;
                     this.currentStep = 'edit';
                     this.syncOutputForm();
                 },
 
-                parseIssuedDateToInput(value) {
-                    if (!value) return '';
-                    const text = String(value).trim();
-                    const slash = text.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-                    if (slash) {
-                        const [, y, m, d] = slash;
-                        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                returnToEdit() {
+                    this.rebuildEditImgs();
+                    if (this.imgs.length === 0) {
+                        if (this.allImgs.length === 0) {
+                            this.pushToast('ドキュメントがありません');
+                            return;
+                        }
+                        const sorted = this.sortedAllImgs();
+                        this.exportViewIndex = sorted.length - 1;
+                        this.currentStep = 'edit';
+                        this.syncOutputForm();
+                        return;
                     }
-                    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-                    if (iso) {
-                        const [, y, m, d] = iso;
-                        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    }
-                    return '';
+                    this.exportViewIndex = null;
+                    this.syncPendingProgress();
+                    this.currentStep = 'edit';
+                    this.syncOutputForm();
                 },
 
-                formatIssuedDateForSave(ymd) {
-                    if (!ymd) return '';
-                    const [y, m, d] = String(ymd).split('-');
-                    if (!y || !m || !d) return '';
+                syncPendingProgress() {
+                    this.pendingProgress = Math.max(1, this.initialPendingTotal - this.imgs.length + 1);
+                },
+
+                formatIssuedOn(value) {
+                    if (!value) return '';
+                    const match = String(value).trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                    if (!match) return '';
+                    const [, y, m, d] = match;
                     return `${y}/${m.padStart(2, '0')}/${d.padStart(2, '0')}`;
                 },
 
-                onIssuedDateChange() {
-                    this.output.issued_date = this.formatIssuedDateForSave(this.issuedDateInput);
+                issuedOnToDateInput(value) {
+                    const formatted = this.formatIssuedOn(value);
+                    if (!formatted) return '';
+                    const [y, m, d] = formatted.split('/');
+                    return `${y}-${m}-${d}`;
+                },
+
+                onIssuedOnChange() {
+                    this.output.issued_on = this.formatIssuedOn(this.issuedOnInput);
+                },
+
+                isExportView() {
+                    return this.exportViewIndex != null;
+                },
+
+                editNavPosition() {
+                    if (this.isExportView()) return this.exportViewIndex + 1;
+                    return this.pendingProgress;
+                },
+
+                editNavTotal() {
+                    if (this.isExportView()) return this.sortedAllImgs().length;
+                    return this.initialPendingTotal;
+                },
+
+                isPrevDisabled() {
+                    if (this.isExportView()) return this.exportViewIndex <= 0;
+                    return this.currentIndex <= 0;
                 },
 
                 currentImg() {
+                    if (this.isExportView()) {
+                        return this.sortedAllImgs()[this.exportViewIndex] || null;
+                    }
                     return this.imgs[this.currentIndex] || null;
+                },
+
+                currentDisplayId() {
+                    const img = this.currentImg();
+                    return img?.display_id ?? null;
+                },
+
+                currentDisplayLabel() {
+                    const id = this.currentDisplayId();
+                    return id != null ? `# ${id}` : '';
                 },
 
                 isCurrentImgFailed() {
                     return this.currentStep === 'edit' && this.currentImg()?.is_failed === true;
                 },
 
+                isCurrentImmutable() {
+                    return this.currentImg()?.is_done === true;
+                },
+
+                advanceWithoutSave() {
+                    if (this.isExportView()) {
+                        const total = this.sortedAllImgs().length;
+                        if (this.exportViewIndex < total - 1) {
+                            this.exportViewIndex++;
+                            this.syncOutputForm();
+                        } else {
+                            this.goToExport();
+                        }
+                        return;
+                    }
+                    if (this.imgs.length > 1 && this.currentIndex < this.imgs.length - 1) {
+                        this.currentIndex++;
+                        this.pendingProgress = Math.min(this.pendingProgress + 1, this.initialPendingTotal);
+                        this.syncOutputForm();
+                    } else {
+                        this.goToExport();
+                    }
+                },
+
                 buildOutputPayload() {
                     const img = this.currentImg();
-                    const labels = this.getOutputLabels(img?.output);
+                    const existing = this.getOutputContent(img?.output);
                     return {
-                        content: { ...this.output },
-                        labels
+                        content: {
+                            ...existing,
+                            issued_on: this.output.issued_on || '',
+                            invoice_number: this.output.invoice_number ?? '',
+                            client_name: this.output.client_name ?? '',
+                            amount: this.output.amount ?? '',
+                            comment: this.output.comment ?? ''
+                        }
                     };
                 },
 
@@ -764,8 +1002,7 @@
 
                 syncPreviewLoadingState() {
                     if (!this.isPreviewLoading) return;
-                    const url = this.lastPreviewUrl;
-                    if (!url || this.isPdfUrl(url)) return;
+                    if (!this.lastPreviewUrl || this.isPdfUrl(this.currentImg()?.url)) return;
                     const imgEl = this.$refs.previewImage;
                     if (imgEl?.complete) {
                         this.handlePreviewLoaded();
@@ -777,10 +1014,12 @@
                     if (!img) {
                         this.isPreviewLoading = false;
                         this.lastPreviewUrl = '';
+                        this.previewSrcOverride = '';
                         return;
                     }
                     this.resetImageZoom();
-                    const nextUrl = String(img.url || '').trim();
+                    this.previewSrcOverride = '';
+                    const nextUrl = this.currentPreviewSrc();
                     const urlChanged = nextUrl !== this.lastPreviewUrl;
                     this.lastPreviewUrl = nextUrl;
                     if (!nextUrl) {
@@ -792,15 +1031,16 @@
                     }
 
                     const content = this.getOutputContent(img.output);
+                    this.currentLabel = this.getOutputLabel(img.output);
 
                     this.output = {
+                        issued_on: this.formatIssuedOn(content.issued_on),
+                        invoice_number: content.invoice_number ?? '',
                         client_name: content.client_name ?? '',
                         amount: content.amount ?? '',
-                        comment: content.comment ?? '',
-                        issued_date: content.issued_date ?? '',
-                        invoice_number: content.invoice_number ?? ''
+                        comment: content.comment ?? ''
                     };
-                    this.issuedDateInput = this.parseIssuedDateToInput(this.output.issued_date);
+                    this.issuedOnInput = this.issuedOnToDateInput(this.output.issued_on);
 
                     this.rawInvoiceNumber = this.output.invoice_number ? String(this.output.invoice_number) : '';
                     this.fetchedCompanyName = '';
@@ -838,7 +1078,7 @@
                     this.invoiceValidating = true;
                     try {
                         const normalizedNumber = String(number || '').trim();
-                        const url = `{NTA_PROXY_BASE_URL}/api/nta?number=${encodeURIComponent(normalizedNumber)}`;
+                        const url = this.ntaApiUrl(normalizedNumber);
                         const res = await fetch(url).catch(() => null);
                         if (!res || !res.ok) {
                             this.fetchedCompanyName = '';
@@ -869,10 +1109,20 @@
                     this.isInvoiceReflected = true;
                 },
 
-                prevImg() { 
-                    if (this.currentIndex > 0) { 
-                        this.currentIndex--; 
-                        this.syncOutputForm(); 
+                prevImg() {
+                    if (this.isExportView()) {
+                        if (this.exportViewIndex > 0) {
+                            this.exportViewIndex--;
+                            this.syncOutputForm();
+                        } else {
+                            this.pushToast('ここが先頭の画像です');
+                        }
+                        return;
+                    }
+                    if (this.currentIndex > 0) {
+                        this.currentIndex--;
+                        this.pendingProgress--;
+                        this.syncOutputForm();
                     } else {
                         this.pushToast('ここが先頭の画像です');
                     }
@@ -881,11 +1131,15 @@
                 async saveAndNext() {
                     const img = this.currentImg();
                     if (!img) return;
+                    if (this.isCurrentImmutable()) {
+                        this.advanceWithoutSave();
+                        return;
+                    }
 
                     this.loading = true;
                     this.loadingText = '保存中...';
                     try {
-                        this.onIssuedDateChange();
+                        this.onIssuedOnChange();
                         const payloadOutput = this.buildOutputPayload();
                         const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/imgs/${encodeURIComponent(img.id)}`, {
                             method: 'PATCH',
@@ -897,18 +1151,32 @@
                             body: JSON.stringify({ is_done: true, output: payloadOutput })
                         });
                         const json = await this.apiJson(res);
-                        this.imgs[this.currentIndex] = {
-                            ...this.imgs[this.currentIndex],
+                        const saved = {
+                            ...img,
                             ...(json.data || {}),
                             output: json.data?.output ?? payloadOutput,
                             is_done: json.data?.is_done ?? true,
                             is_failed: json.data?.is_failed ?? false
                         };
+                        this.updateAllImgsEntry(img.id, saved);
+                        this.rebuildEditImgs();
 
                         this.pushToast('保存しました');
 
-                        if (this.currentIndex < this.imgs.length - 1) {
-                            this.currentIndex++;
+                        if (this.isExportView()) {
+                            const total = this.sortedAllImgs().length;
+                            if (this.exportViewIndex < total - 1) {
+                                this.exportViewIndex++;
+                                this.syncOutputForm();
+                            } else {
+                                this.goToExport();
+                            }
+                            return;
+                        }
+
+                        if (this.imgs.length > 0) {
+                            this.pendingProgress = Math.min(this.pendingProgress + 1, this.initialPendingTotal);
+                            this.currentIndex = Math.min(this.currentIndex, this.imgs.length - 1);
                             this.syncOutputForm();
                         } else {
                             this.goToExport();
@@ -925,24 +1193,29 @@
 
                 async resolveReadError() {
                     const img = this.currentImg();
-                    if (!img || this.loading) return;
+                    if (!img || this.loading || this.isCurrentImmutable()) return;
                     this.loading = true;
                     this.loadingText = '更新中...';
                     try {
-                        const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/imgs/${encodeURIComponent(img.id)}`, {
+                        const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/imgs/${encodeURIComponent(img.id)}?is_retry=true`, {
                             method: 'PATCH',
                             headers: {
                                 accept: 'application/json',
                                 'Content-Type': 'application/json',
                                 Authorization: `Bearer ${this.token}`
                             },
-                            body: JSON.stringify({ is_failed: false })
+                            body: JSON.stringify({})
                         });
                         const json = await this.apiJson(res);
-                        this.imgs[this.currentIndex] = {
-                            ...this.imgs[this.currentIndex],
+                        const updated = {
+                            ...img,
                             ...(json.data || {})
                         };
+                        if (!this.isExportView()) {
+                            this.imgs[this.currentIndex] = updated;
+                        }
+                        this.updateAllImgsEntry(img.id, updated);
+                        this.rebuildEditImgs();
                         this.syncOutputForm();
                         this.pushToast('読み取りエラーを解消しました');
                     } catch (e) {
@@ -956,13 +1229,13 @@
                 },
 
                 requestDeleteImg() {
-                    if (!this.currentImg() || this.loading) return;
+                    if (!this.currentImg() || this.loading || this.isCurrentImmutable()) return;
                     this.deleteConfirmOpen = true;
                 },
 
                 async confirmDeleteImg() {
                     const img = this.currentImg();
-                    if (!img) return;
+                    if (!img || this.isCurrentImmutable()) return;
                     this.deleteConfirmOpen = false;
                     this.loading = true;
                     this.loadingText = '削除中...';
@@ -975,14 +1248,27 @@
                             }
                         });
                         await this.apiJson(res);
-                        this.imgs.splice(this.currentIndex, 1);
-                        if (this.currentIndex >= this.imgs.length) {
-                            this.currentIndex = Math.max(0, this.imgs.length - 1);
-                        }
-                        if (this.imgs.length > 0) {
+                        const deletedId = img.id;
+                        this.allImgs = this.allImgs.filter((row) => row.id !== deletedId);
+                        if (this.isExportView()) {
+                            const remaining = this.sortedAllImgs();
+                            if (remaining.length === 0) {
+                                this.exportViewIndex = null;
+                                this.rebuildEditImgs();
+                                this.currentStep = 'edit';
+                            } else if (this.exportViewIndex >= remaining.length) {
+                                this.exportViewIndex = remaining.length - 1;
+                            }
                             this.syncOutputForm();
                         } else {
-                            this.currentStep = 'edit';
+                            this.rebuildEditImgs();
+                            if (this.imgs.length > 0) {
+                                this.syncOutputForm();
+                            } else if (this.allImgs.length > 0) {
+                                this.goToExport();
+                            } else {
+                                this.currentStep = 'edit';
+                            }
                         }
                         this.pushToast('画像を削除しました');
                     } catch (e) {
@@ -996,18 +1282,31 @@
                 },
 
                 goToExport() {
+                    this.exportViewIndex = null;
                     this.currentStep = 'export';
+                },
+
+                goToEditFromExport(index) {
+                    if (index < 0 || index >= this.sortedAllImgs().length) return;
+                    this.exportViewIndex = index;
+                    this.currentStep = 'edit';
+                    this.syncOutputForm();
                 },
 
                 processExport() {
                     const isoTime = new Date().toISOString().replace(/[:.]/g, '-');
                     const rows = [["日付", "収入", "支出", "摘要"]];
-                    this.imgs.forEach(img => {
+                    this.sortedAllImgs().forEach(img => {
                         const out = this.getOutputContent(img.output);
                         const remarks = [out.client_name, out.comment]
                             .filter((v) => String(v || '').trim().length > 0)
                             .join(' ');
-                        rows.push([out.issued_date || '', 0, out.amount || 0, remarks]);
+                        rows.push([
+                            this.formatIssuedOn(out.issued_on) || '',
+                            0,
+                            out.amount || 0,
+                            remarks
+                        ]);
                     });
                     this.downloadCsv(`receipt_${isoTime}.csv`, rows);
                     this.pushToast('CSVを出力しました');
@@ -1029,29 +1328,96 @@
                     URL.revokeObjectURL(url);
                 },
 
-                async fetchTask() {
-                    this.loading = true;
-                    this.loadingText = 'フォルダを読み込み中...';
-                    try {
-                        const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}`, {
+                async fetchTaskMeta() {
+                    const res = await fetch(
+                        `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/search`,
+                        {
+                            method: 'POST',
                             headers: {
                                 accept: 'application/json',
+                                'Content-Type': 'application/json',
                                 Authorization: `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({ page: 1, size: 1, task_id: this.taskId })
+                        }
+                    );
+                    const json = await res.json().catch(() => ({}));
+                    if (res.status === 401) {
+                        localStorage.removeItem(TOKEN_KEY);
+                        this.redirectLogin();
+                        throw new Error('unauthorized');
+                    }
+                    if (!res.ok || json.success === false) {
+                        const code = Array.isArray(json.errors) && json.errors[0]?.code
+                            ? json.errors[0].code
+                            : '';
+                        if (res.status === 404 || code === 'TASK_NOT_FOUND' || code === 'RULE_NOT_MATCHED_FOR_BOARD') {
+                            throw new Error('タスクが見つかりません。ボードID・テナント・ログインアカウントを確認してください。');
+                        }
+                        const msg = Array.isArray(json.errors) && json.errors[0]?.msg
+                            ? json.errors[0].msg
+                            : 'タスクの取得に失敗しました';
+                        throw new Error(msg);
+                    }
+                    const item = json.data?.items?.[0];
+                    if (!item?.id) {
+                        throw new Error('タスクが見つかりません。ボードID・テナント・ログインアカウントを確認してください。');
+                    }
+                    return item.name || '';
+                },
+
+                async fetchTaskImgs() {
+                    const allImgs = [];
+                    let page = 1;
+                    let hasNext = true;
+                    const size = 50;
+                    const headers = {
+                        accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.token}`
+                    };
+                    while (hasNext) {
+                        const res = await fetch(
+                            `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/search`,
+                            {
+                                method: 'POST',
+                                headers,
+                                body: JSON.stringify({ page, size, sort: 'created_at_desc' })
                             }
-                        });
+                        );
                         const json = await this.apiJson(res);
-                        if (!json.data) throw new Error('タスクの取得に失敗しました');
-                        this.taskName = json.data.name || '';
-                        this.imgs = json.data.imgs || [];
-                        if (this.imgs.length > 0) {
-                            this.startEditing();
-                        } else {
+                        const data = json.data || {};
+                        for (const group of data.items || []) {
+                            for (const img of group.imgs || []) {
+                                allImgs.push(img);
+                            }
+                        }
+                        hasNext = data.has_next === true;
+                        page += 1;
+                    }
+                    return allImgs;
+                },
+
+                async fetchTask() {
+                    this.loading = true;
+                    this.loadingText = 'タスクを読み込み中...';
+                    this.loadError = '';
+                    this.currentStep = 'list';
+                    try {
+                        this.taskName = await this.fetchTaskMeta();
+                        this.allImgs = await this.fetchTaskImgs();
+                        if (this.allImgs.length === 0) {
+                            this.loadError = 'このタスクにはまだドキュメントがありません。';
                             this.pushToast('ドキュメントがありません');
+                        } else {
+                            this.initialPendingTotal = this.allImgs.filter((img) => img.is_done !== true).length;
+                            this.startEditing();
                         }
                         this.initialized = true;
                     } catch (e) {
                         if (e?.message !== 'unauthorized') {
-                            this.pushToast(e?.message || 'データの取得に失敗しました');
+                            this.loadError = e?.message || 'データの取得に失敗しました';
+                            this.pushToast(this.loadError);
                         }
                     } finally {
                         this.loading = false;

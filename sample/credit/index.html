@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クレジット明細チェッカー</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/rsfact/assets/main/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #1c92ff;
+            --color-accent: #ff8428;
+            --layout-max: min(1680px, 100%);
+        }
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        body { background: #fafafa; color: #333; }
+        .app { height: 100%; display: flex; flex-direction: column; }
+        .layout-shell { width: 100%; max-width: var(--layout-max); margin: 0 auto; }
+        .main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.5rem 1.25rem 0; }
+        .edit-workspace {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .workspace-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 5rem;
+        }
+        .page-pair {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e5e7eb;
+            align-items: start;
+        }
+        .page-pair:last-child { border-bottom: 0; }
+        @media (min-width: 1024px) {
+            .page-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: 1.5rem; }
+            .page-pair { align-items: start; overflow: hidden; }
+            .page-form {
+                overflow: hidden;
+                min-height: 0;
+            }
+        }
+        .page-preview { min-width: 0; width: 100%; }
+        .page-preview-frame {
+            position: relative;
+            overflow: hidden;
+            background: #f9fafb;
+            border-radius: 0.75rem;
+            width: 100%;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-preview-frame--failed { background: rgba(254, 242, 242, 0.45); }
+        .page-preview-frame img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            touch-action: none;
+            user-select: none;
+        }
+        .preview-img--grab { cursor: grab; }
+        .preview-img--grabbing { cursor: grabbing; }
+        .page-zoom-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.375rem;
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+        }
+        .workspace-zoom-bar {
+            position: absolute;
+            bottom: 4.75rem;
+            left: 0;
+            width: 100%;
+            z-index: 24;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+        @media (min-width: 1024px) {
+            .workspace-zoom-bar {
+                bottom: 1.25rem;
+                width: calc(100% * 1 / 2.12);
+            }
+        }
+        .workspace-zoom-bar .page-zoom-controls {
+            pointer-events: auto;
+        }
+        .page-zoom-btn {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #374151;
+            font-size: 1.125rem;
+            font-weight: 700;
+            line-height: 1;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .page-zoom-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+        .page-zoom-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .page-zoom-label {
+            min-width: 2.75rem;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            font-family: ui-monospace, monospace;
+            user-select: none;
+        }
+        .page-preview-frame iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 420px;
+            border: 0;
+            border-radius: 0.5rem;
+        }
+        .page-form {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: #fff;
+            border: 1px solid #f3f4f6;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .page-form-head {
+            flex-shrink: 0;
+            padding: 0 0.25rem;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            border-radius: 0.5rem 0.5rem 0 0;
+        }
+        .page-form-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 0.25rem 0.5rem;
+        }
+        .page-badge {
+            position: absolute;
+            top: 0.625rem;
+            left: 0.625rem;
+            z-index: 10;
+            pointer-events: none;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.375rem;
+            border: 1px solid #c7d2fe;
+            background: rgba(238, 242, 255, 0.95);
+            color: #4338ca;
+            font-size: 0.875rem;
+            font-weight: 700;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+        .page-badge--failed {
+            border-color: #fecaca;
+            background: rgba(254, 242, 242, 0.95);
+            color: #dc2626;
+        }
+        .app-toolbar {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+        .data-table--head { margin: 0; }
+        .data-table--head th {
+            font-size: 0.875rem;
+            letter-spacing: 0.03em;
+            color: #4b5563;
+            background: #f9fafb;
+            padding: 0.625rem 0.5rem;
+            border-bottom: 0;
+            font-weight: 600;
+            text-align: left;
+        }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 1.0625rem; table-layout: fixed; }
+        .data-table--page { margin: 0; }
+        .data-table--page tbody tr:first-child td {
+            padding-top: 0;
+        }
+        .data-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+        .data-table input[type="date"],
+        .data-table input[type="text"] {
+            width: 100%;
+            font-size: 1.0625rem;
+            padding: 0.5625rem 0.625rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+        .data-table input:focus { outline: none; border-color: #38bdf8; }
+        .data-table .col-date { width: 9.5rem; }
+        .data-table .col-amount { width: 7.25rem; }
+        .data-table .col-action { width: 2.75rem; }
+        .amount-cell {
+            position: relative;
+            text-align: right;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            white-space: nowrap;
+        }
+        .amount-cell--refund input { color: #dc2626; font-weight: 700; }
+        .label-error {
+            padding: 1rem;
+            text-align: center;
+            color: #b45309;
+            background: #fffbeb;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .amount-cell--in-range {
+            background: rgba(26, 107, 60, 0.16);
+        }
+        .amount-cell--anchor {
+            box-shadow: inset 0 0 0 2px #1a6b3c;
+            background: rgba(26, 107, 60, 0.24);
+        }
+        .amount-cell--hover {
+            box-shadow: inset 0 0 0 2px #1a6b3c;
+        }
+        .amount-input { -moz-appearance: textfield; appearance: textfield; text-align: right; }
+        .amount-input::-webkit-outer-spin-button,
+        .amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .row-hidden { display: none; }
+        .selection-badge-host {
+            position: fixed;
+            bottom: 1.25rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 25;
+            display: grid;
+            place-items: center;
+            pointer-events: none;
+        }
+        .selection-badge-host > .selection-badge {
+            grid-area: 1 / 1;
+            pointer-events: auto;
+        }
+        .selection-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 9999px;
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.14);
+            backdrop-filter: blur(8px);
+            white-space: nowrap;
+        }
+        .selection-badge--total {
+            background: rgba(255, 247, 237, 0.98);
+            border: 1px solid #fb923c;
+        }
+        .selection-badge--range {
+            background: rgba(240, 250, 244, 0.98);
+            border: 1px solid #9bc4a8;
+        }
+        .selection-bar {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: ui-monospace, monospace;
+            white-space: nowrap;
+        }
+        .selection-badge--total .selection-bar { color: #ea580c; }
+        .selection-badge--range .selection-bar { color: #1a6b3c; }
+        .selection-reset {
+            height: 2.25rem;
+            padding: 0 0.875rem;
+            border-radius: 0.5rem;
+            border: 1px solid #b8d4c6;
+            background: #fff;
+            color: #1a6b3c;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .selection-reset:hover { background: #f0faf4; }
+        .badge-swap-enter {
+            transition: opacity 0.32s ease, transform 0.32s ease;
+        }
+        .badge-swap-enter-start {
+            opacity: 0;
+            transform: scale(0.94) translateY(6px);
+        }
+        .badge-swap-enter-end {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .badge-swap-leave {
+            transition: opacity 0.26s ease, transform 0.26s ease;
+        }
+        .badge-swap-leave-start {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .badge-swap-leave-end {
+            opacity: 0;
+            transform: scale(0.96) translateY(-4px);
+        }
+        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+        [x-cloak] { display: none !important; }
+        .toast-container {
+            position: fixed;
+            top: 0.75rem;
+            right: 0.75rem;
+            z-index: 50;
+            pointer-events: none;
+        }
+        .toast-item {
+            padding: 0.375rem 0.625rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+            font-size: 0.75rem;
+            background: #111827;
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased app" x-data="appCtrl()" x-init="init()">
+
+    <header class="bg-white shadow-sm border-b border-gray-100 shrink-0 z-40">
+        <div class="layout-shell px-4 md:px-6 min-h-16 py-2 flex items-center gap-4">
+            <div class="flex items-center gap-3 shrink-0 min-w-0">
+                <i class="fa-solid fa-credit-card text-lg text-violet-500 shrink-0"></i>
+                <span class="font-bold tracking-tight text-sm truncate">クレジット明細チェッカー</span>
+                <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs hover:bg-gray-50 shrink-0" @click="logout">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>ログアウト</span>
+                </button>
+            </div>
+            <div class="app-toolbar" x-show="step === 'edit' && allImgs.length" x-cloak>
+                <label class="flex items-center gap-2 text-sm text-gray-600 shrink-0">
+                    <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+                    <span class="font-semibold whitespace-nowrap">金額検索</span>
+                    <input
+                        type="text"
+                        inputmode="numeric"
+                        x-model="amountFilter"
+                        placeholder="1500"
+                        class="w-32 px-2.5 py-1.5 border border-gray-200 rounded-lg text-base font-mono focus:outline-none focus:border-sky-400"
+                    >
+                </label>
+                <button
+                    type="button"
+                    @click="saveDraft()"
+                    :disabled="loading || !canSaveDocs()"
+                    class="border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 py-2 px-5 rounded-xl font-semibold text-sm transition shadow-sm shrink-0"
+                >
+                    一時保存
+                </button>
+                <button
+                    type="button"
+                    @click="finishAll()"
+                    :disabled="loading || !canSaveDocs()"
+                    class="bg-[#ff8428] hover:bg-orange-600 disabled:opacity-50 text-white py-2 px-6 rounded-xl font-semibold text-sm transition shadow-sm shrink-0"
+                >
+                    完了
+                </button>
+                <p
+                    x-show="hasImmutableDocs()"
+                    class="text-xs text-amber-700 font-medium whitespace-nowrap"
+                    x-cloak
+                >
+                    確定済みのページは編集できません
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <main class="main layout-shell w-full">
+        <div x-show="loading" class="fixed inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center" x-cloak>
+            <div class="animate-spin h-10 w-10 border-4 border-violet-400 border-t-transparent rounded-full"></div>
+        </div>
+
+        <div x-show="loadError" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-center" x-cloak>
+            <p x-text="loadError"></p>
+        </div>
+
+        <!-- 編集（ページ単位で左右並列） -->
+        <div class="edit-workspace" x-show="step === 'edit' && allImgs.length" x-cloak>
+            <div class="workspace-scroll custom-scroll" x-ref="workspaceScroll" @click="onFormPanelClick($event)">
+                <template x-for="(doc, di) in allImgs" :key="doc.id">
+                    <section class="page-pair" :data-doc-index="di">
+                        <div class="page-preview">
+                            <div
+                                class="page-preview-frame"
+                                :class="doc.is_failed ? 'page-preview-frame--failed' : ''"
+                                :data-preview-frame="doc.id"
+                            >
+                                <span
+                                    x-show="doc.display_id != null"
+                                    class="page-badge"
+                                    :class="doc.is_failed ? 'page-badge--failed' : ''"
+                                    x-text="'#' + doc.display_id"
+                                ></span>
+                                <iframe
+                                    x-show="isPdfUrl(doc.url)"
+                                    :src="docPreviewUrl(doc)"
+                                    title="preview"
+                                    @load="onPagePreviewLoad(doc.id, $event)"
+                                ></iframe>
+                                <img
+                                    x-show="docPreviewUrl(doc) && !isPdfUrl(doc.url)"
+                                    :src="docPreviewUrl(doc)"
+                                    alt="preview"
+                                    draggable="false"
+                                    :class="pageImagePanCursorClass(doc.id)"
+                                    :style="pageImageZoomStyle(doc.id)"
+                                    @load="onPageImageLoad(doc.id, $event)"
+                                    @error="onDocPreviewError(doc, $event)"
+                                    @pointerdown="onPageImagePointerDown(doc.id, $event)"
+                                    @pointermove="onPageImagePointerMove(doc.id, $event)"
+                                    @pointerup="onPageImagePointerUp(doc.id, $event)"
+                                    @pointercancel="onPageImagePointerUp(doc.id, $event)"
+                                >
+                            </div>
+                        </div>
+                        <div class="page-form">
+                            <div class="page-form-head">
+                                <table class="data-table data-table--head">
+                                    <colgroup>
+                                        <col class="col-date">
+                                        <col class="col-amount">
+                                        <col class="col-comment">
+                                        <col class="col-action">
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th x-text="itemColumnLabel(doc, 'issued_on')"></th>
+                                            <th x-text="itemColumnLabel(doc, 'amount')"></th>
+                                            <th x-text="itemColumnLabel(doc, 'comment')"></th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                            <div class="page-form-scroll custom-scroll" :data-form-scroll="doc.id" @wheel="onPageFormWheel($event)" @mouseleave="onFormTableMouseLeave()">
+                                <table class="data-table data-table--page">
+                                    <colgroup>
+                                        <col class="col-date">
+                                        <col class="col-amount">
+                                        <col class="col-comment">
+                                        <col class="col-action">
+                                    </colgroup>
+                                    <tbody>
+                                        <tr x-show="docLabelsMismatch(doc)">
+                                            <td colspan="4" class="label-error">
+                                                ラベル定義が他ページと一致しません（このページは編集できません）
+                                            </td>
+                                        </tr>
+                                        <template x-for="(row, ri) in docRows(doc.id)" :key="ri">
+                                            <tr
+                                                x-show="!docLabelsMismatch(doc) && rowVisible(doc.id, ri, row)"
+                                                class="hover:bg-gray-50/70"
+                                                :data-row-index="ri"
+                                            >
+                                                <td>
+                                                    <input type="date" x-model="row.dateInput" @change="onDateChange(doc.id, ri)" :disabled="isDocImmutable(doc)">
+                                                </td>
+                                                <td
+                                                    class="amount-cell"
+                                                    :class="{
+                                                        'amount-cell--refund': row.is_refund,
+                                                        'amount-cell--anchor': isAmountAnchor(doc.id, ri),
+                                                        'amount-cell--in-range': isAmountInRange(doc.id, ri),
+                                                        'amount-cell--hover': amountHoverKey === cellKey(doc.id, ri)
+                                                    }"
+                                                    @mousedown="onAmountCellMouseDown(doc.id, ri, $event)"
+                                                    @mouseenter="onAmountCellMouseEnter(doc.id, ri)"
+                                                    @mouseleave="onAmountCellMouseLeave(doc.id, ri)"
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        inputmode="decimal"
+                                                        x-model="row.amountInput"
+                                                        @mousedown.stop="onAmountInputMouseDown($event)"
+                                                        @focus="clearAmountSelection()"
+                                                        @input="onAmountInput(doc.id, ri)"
+                                                        @blur="onAmountBlur(doc.id, ri)"
+                                                        :disabled="isDocImmutable(doc)"
+                                                        class="amount-input w-full border border-gray-200 rounded-lg px-2 py-2"
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <input type="text" x-model="row.comment" :disabled="isDocImmutable(doc)">
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" x-show="!isDocImmutable(doc)" @click="removeRow(doc.id, ri)" class="w-9 h-9 inline-flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600" title="行削除">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="!docLabelsMismatch(doc) && !isDocImmutable(doc)">
+                                            <td colspan="4" class="pt-1 pb-3">
+                                                <button type="button" @click="addRow(doc.id)" class="text-sm font-semibold text-sky-600 hover:text-sky-800">
+                                                    <i class="fa-solid fa-plus mr-1"></i>行を追加
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </template>
+            </div>
+            <div class="workspace-zoom-bar" x-show="hasZoomableImages()" x-cloak @click.stop @mousedown.stop>
+                <div class="page-zoom-controls">
+                    <button
+                        type="button"
+                        class="page-zoom-btn"
+                        title="縮小"
+                        :disabled="globalZoomScale <= 0.4"
+                        @click="zoomOutAllImages()"
+                    >−</button>
+                    <span class="page-zoom-label" x-text="globalZoomLabel()"></span>
+                    <button
+                        type="button"
+                        class="page-zoom-btn"
+                        title="拡大"
+                        :disabled="globalZoomScale >= 5"
+                        @click="zoomInAllImages()"
+                    >＋</button>
+                </div>
+            </div>
+            <div class="selection-badge-host">
+                <div
+                    class="selection-badge selection-badge--total"
+                    x-show="!amountRangeStart"
+                    x-transition:enter="badge-swap-enter"
+                    x-transition:enter-start="badge-swap-enter-start"
+                    x-transition:enter-end="badge-swap-enter-end"
+                    x-transition:leave="badge-swap-leave"
+                    x-transition:leave-start="badge-swap-leave-start"
+                    x-transition:leave-end="badge-swap-leave-end"
+                >
+                    <span class="selection-bar" x-text="totalBadgeText()"></span>
+                </div>
+                <div
+                    class="selection-badge selection-badge--range"
+                    x-show="amountRangeStart"
+                    x-transition:enter="badge-swap-enter"
+                    x-transition:enter-start="badge-swap-enter-start"
+                    x-transition:enter-end="badge-swap-enter-end"
+                    x-transition:leave="badge-swap-leave"
+                    x-transition:leave-start="badge-swap-leave-start"
+                    x-transition:leave-end="badge-swap-leave-end"
+                    x-cloak
+                >
+                    <span class="selection-bar" x-text="amountRangeSummary"></span>
+                    <button
+                        type="button"
+                        class="selection-reset"
+                        title="選択をリセット"
+                        @click="clearAmountSelection()"
+                    >
+                        リセット
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- エクスポート -->
+        <div x-show="step === 'export'" class="flex-1 min-h-0 overflow-y-auto custom-scroll space-y-4 pr-1" x-cloak>
+            <button @click="step = 'edit'" class="text-sm text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-arrow-left mr-1"></i>編集に戻る
+            </button>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div class="flex justify-center">
+                    <button @click="processExport()" class="bg-[#1c92ff] hover:bg-blue-600 text-white py-4 px-10 rounded-2xl font-bold text-base shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i>弥生会計用 CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 border-b">
+                                <th class="p-3 text-left">取引日付</th>
+                                <th class="p-3 text-right">ご利用金額</th>
+                                <th class="p-3 text-right">返金額</th>
+                                <th class="p-3 text-left">摘要</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, i) in exportRows()" :key="i">
+                                <tr class="border-b border-gray-50 hover:bg-sky-50/50">
+                                    <td class="p-3 font-mono" x-text="row.date"></td>
+                                    <td class="p-3 font-mono text-right" :class="row.deposit ? '' : 'text-gray-300'" x-text="row.deposit || '—'"></td>
+                                    <td class="p-3 font-mono text-right" :class="row.withdraw ? '' : 'text-gray-300'" x-text="row.withdraw || '—'"></td>
+                                    <td class="p-3 text-gray-600 truncate max-w-xs" x-text="row.comment"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="toast-container space-y-1.5">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="toast-item" x-text="t.msg"></div>
+        </template>
+    </div>
+
+    <script>
+        const TOKEN_KEY = "snb_customer_token";
+        const params = new URLSearchParams(window.location.search);
+
+        const DEFAULT_ITEM_LABELS = {
+            issued_on: "取引日付",
+            amount: "金額",
+            comment: "摘要",
+            is_refund: "返金分"
+        };
+
+        function appCtrl() {
+            return {
+                baseUrl: new URL("/snb/api", window.location.origin).toString(),
+                boardId: "",
+                taskId: "",
+                token: "",
+                loading: false,
+                loadError: "",
+                taskName: "",
+                step: "edit",
+                allImgs: [],
+                docItems: {},
+                amountFilter: "",
+                toasts: [],
+                docZoom: {},
+                globalZoomScale: 1,
+                zoomStep: 0.2,
+                panSensitivity: 0.55,
+                amountRangeStart: null,
+                amountRangeEnd: null,
+                amountCellIndex: {},
+                amountRangeLo: -1,
+                amountRangeHi: -1,
+                amountRangeSummary: "",
+                amountHoverKey: "",
+                previewSrcOverrideById: {},
+
+                init() {
+                    this.boardId = params.get("board_id") || "";
+                    this.taskId = params.get("task_id") || "";
+                    this.token = localStorage.getItem(TOKEN_KEY) || "";
+                    if (!this.boardId || !this.taskId) { this.loadError = "board_id / task_id が必要です"; return; }
+                    if (!this.token) { this.redirectLogin(); return; }
+                    this.fetchAll();
+                    this.$watch("amountFilter", () => {
+                        this.rebuildAmountCellIndex();
+                        if (this.amountRangeStart) {
+                            this.syncAmountRange(this.amountRangeStart, this.amountRangeStart);
+                        }
+                        const q = String(this.amountFilter || "").trim();
+                        this.$nextTick(() => {
+                            if (!q) return;
+                            this.$nextTick(() => this.scrollToFirstAmountFilterMatch());
+                        });
+                    });
+                    window.addEventListener("keydown", (e) => {
+                        if (e.key === "Escape") this.clearAmountSelection();
+                    });
+                    this._onResizeSyncHeights = () => {
+                        this.$nextTick(() => this.refitAllPagePreviews());
+                    };
+                    window.addEventListener("resize", this._onResizeSyncHeights);
+                },
+
+                toast(msg) {
+                    const id = Date.now();
+                    this.toasts.push({ id, msg });
+                    setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 2500);
+                },
+
+                redirectLogin() {
+                    const u = new URL("./login.html", location.href);
+                    u.searchParams.set("board_id", this.boardId);
+                    u.searchParams.set("task_id", this.taskId);
+                    location.href = u.toString();
+                },
+
+                logout() {
+                    localStorage.removeItem(TOKEN_KEY);
+                    this.redirectLogin();
+                },
+
+                isPdfUrl(url) {
+                    return String(url || "").split("?")[0].toLowerCase().endsWith(".pdf");
+                },
+
+                imgContentUrl(img) {
+                    const board = String(this.boardId || "").trim();
+                    const task = String(this.taskId || "").trim();
+                    const imgId = String(img?.id || "").trim();
+                    if (!board || !task || !imgId) return "";
+                    return `${this.baseUrl}/v1/boards/${encodeURIComponent(board)}/tasks/${encodeURIComponent(task)}/imgs/${encodeURIComponent(imgId)}/content`;
+                },
+
+                docPreviewUrl(doc) {
+                    const imgId = String(doc?.id || "").trim();
+                    if (imgId && this.previewSrcOverrideById[imgId]) {
+                        return this.previewSrcOverrideById[imgId];
+                    }
+                    return this.imgContentUrl(doc) || String(doc?.url || "").trim();
+                },
+
+                onDocPreviewError(doc, event) {
+                    const fallback = String(doc?.url || "").trim();
+                    const imgId = String(doc?.id || "").trim();
+                    const el = event?.target;
+                    if (!fallback || !imgId || !el) return;
+                    if (el.src === fallback || this.previewSrcOverrideById[imgId] === fallback) return;
+                    this.previewSrcOverrideById = { ...this.previewSrcOverrideById, [imgId]: fallback };
+                },
+
+                getDocZoom(docId) {
+                    if (!this.docZoom[docId]) {
+                        this.docZoom[docId] = {
+                            panX: 0,
+                            panY: 0,
+                            origin: { x: 50, y: 50 },
+                            dragging: false,
+                            dragStart: null
+                        };
+                    }
+                    const z = this.docZoom[docId];
+                    z.scale = this.globalZoomScale;
+                    return z;
+                },
+
+                resetDocZoom(docId) {
+                    const z = this.getDocZoom(docId);
+                    z.panX = 0;
+                    z.panY = 0;
+                    z.origin = { x: 50, y: 50 };
+                    z.dragging = false;
+                    z.dragStart = null;
+                },
+
+                hasZoomableImages() {
+                    return this.allImgs.some(doc => this.canZoomDoc(doc));
+                },
+
+                globalZoomLabel() {
+                    return `${Math.round(this.globalZoomScale * 100)}%`;
+                },
+
+                canZoomDoc(doc) {
+                    const url = doc?.url || "";
+                    return Boolean(url) && !this.isPdfUrl(url);
+                },
+
+                pageImagePanCursorClass(docId) {
+                    const doc = this.allImgs.find(d => d.id === docId);
+                    if (!doc || !this.canZoomDoc(doc)) return "";
+                    const z = this.getDocZoom(docId);
+                    if (z.scale <= 1) return "";
+                    if (z.dragging) return "preview-img--grabbing";
+                    return "preview-img--grab";
+                },
+
+                pageZoomLabel(docId) {
+                    return this.globalZoomLabel();
+                },
+
+                applyGlobalZoomToAll() {
+                    for (const doc of this.allImgs) {
+                        if (!this.canZoomDoc(doc)) continue;
+                        const z = this.getDocZoom(doc.id);
+                        z.origin = { x: 50, y: 50 };
+                        this.afterPageImageZoom(doc.id);
+                    }
+                },
+
+                zoomInAllImages(step = this.zoomStep) {
+                    this.globalZoomScale = Math.min(5, Number((this.globalZoomScale + step).toFixed(2)));
+                    this.applyGlobalZoomToAll();
+                },
+
+                zoomOutAllImages(step = this.zoomStep) {
+                    this.globalZoomScale = Math.max(0.4, Number((this.globalZoomScale - step).toFixed(2)));
+                    this.applyGlobalZoomToAll();
+                },
+
+                pageImageZoomStyle(docId) {
+                    const z = this.getDocZoom(docId);
+                    const o = z.origin;
+                    return `transform: translate(${z.panX}px, ${z.panY}px) scale(${z.scale}); transform-origin: ${o.x}% ${o.y}%`;
+                },
+
+                getPageImageEl(docId) {
+                    const frame = document.querySelector(`[data-preview-frame="${docId}"]`);
+                    return frame?.querySelector("img") || null;
+                },
+
+                applyPageImageTransform(docId) {
+                    const img = this.getPageImageEl(docId);
+                    if (!img) return;
+                    const z = this.getDocZoom(docId);
+                    const o = z.origin;
+                    img.style.transform = `translate(${z.panX}px, ${z.panY}px) scale(${z.scale}); transform-origin: ${o.x}% ${o.y}%`;
+                },
+
+                clampPageImagePan(docId) {
+                    const img = this.getPageImageEl(docId);
+                    const container = document.querySelector(`[data-preview-frame="${docId}"]`);
+                    const z = this.getDocZoom(docId);
+                    if (!img || !container) return;
+
+                    if (z.scale <= 1) {
+                        z.panX = 0;
+                        z.panY = 0;
+                        z.origin = { x: 50, y: 50 };
+                        this.applyPageImageTransform(docId);
+                        return;
+                    }
+
+                    this.applyPageImageTransform(docId);
+
+                    const eps = 0.5;
+                    const c = container.getBoundingClientRect();
+                    const i = img.getBoundingClientRect();
+                    if (c.width <= 0 || c.height <= 0) return;
+
+                    let dx = 0;
+                    let dy = 0;
+
+                    if (i.width <= c.width + eps) {
+                        dx = (c.left + c.width / 2) - (i.left + i.width / 2);
+                    } else if (i.left > c.left + eps) {
+                        dx = c.left - i.left;
+                    } else if (i.right < c.right - eps) {
+                        dx = c.right - i.right;
+                    }
+
+                    if (i.height <= c.height + eps) {
+                        dy = (c.top + c.height / 2) - (i.top + i.height / 2);
+                    } else if (i.top > c.top + eps) {
+                        dy = c.top - i.top;
+                    } else if (i.bottom < c.bottom - eps) {
+                        dy = c.bottom - i.bottom;
+                    }
+
+                    if (Math.abs(dx) > 0.01) z.panX += dx;
+                    if (Math.abs(dy) > 0.01) z.panY += dy;
+
+                    this.applyPageImageTransform(docId);
+                },
+
+                afterPageImageZoom(docId) {
+                    const z = this.getDocZoom(docId);
+                    if (z.scale <= 1) {
+                        z.panX = 0;
+                        z.panY = 0;
+                        z.origin = { x: 50, y: 50 };
+                        this.applyPageImageTransform(docId);
+                        return;
+                    }
+                    this.clampPageImagePan(docId);
+                },
+
+                onPageImagePointerDown(docId, event) {
+                    const doc = this.allImgs.find(d => d.id === docId);
+                    if (!doc || !this.canZoomDoc(doc)) return;
+                    const z = this.getDocZoom(docId);
+                    if (z.scale <= 1) return;
+                    if (event.button !== 0) return;
+                    event.preventDefault();
+                    z.dragging = true;
+                    z.dragStart = {
+                        clientX: event.clientX,
+                        clientY: event.clientY,
+                        panX: z.panX,
+                        panY: z.panY
+                    };
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                },
+
+                onPageImagePointerMove(docId, event) {
+                    const z = this.getDocZoom(docId);
+                    if (!z.dragging || !z.dragStart) return;
+                    if (z.scale <= 1) return;
+                    event.preventDefault();
+                    z.panX = z.dragStart.panX
+                        + (event.clientX - z.dragStart.clientX) * this.panSensitivity;
+                    z.panY = z.dragStart.panY
+                        + (event.clientY - z.dragStart.clientY) * this.panSensitivity;
+                    this.clampPageImagePan(docId);
+                },
+
+                onPageImagePointerUp(docId, event) {
+                    const z = this.getDocZoom(docId);
+                    if (!z.dragging) return;
+                    z.dragging = false;
+                    z.dragStart = null;
+                    this.clampPageImagePan(docId);
+                    try {
+                        event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    } catch (_) {}
+                },
+
+
+                syncPagePairHeights(docId) {
+                    const pagePair = document.querySelector(`[data-preview-frame="${docId}"]`)?.closest(".page-pair");
+                    const frame = pagePair?.querySelector(`[data-preview-frame="${docId}"]`);
+                    const form = pagePair?.querySelector(".page-form");
+                    const formScroll = pagePair?.querySelector(`[data-form-scroll="${docId}"]`);
+                    if (!pagePair || !frame || !form || !formScroll) return;
+
+                    const frameH = Math.ceil(frame.offsetHeight);
+                    if (frameH <= 0) return;
+
+                    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+                    if (isDesktop) {
+                        pagePair.style.height = `${frameH}px`;
+                        pagePair.style.maxHeight = `${frameH}px`;
+                        form.style.height = `${frameH}px`;
+                        form.style.maxHeight = `${frameH}px`;
+                        formScroll.style.height = "";
+                        formScroll.style.maxHeight = "";
+                    } else {
+                        pagePair.style.height = "";
+                        pagePair.style.maxHeight = "";
+                        form.style.height = "";
+                        form.style.maxHeight = "";
+                        const headH = form.querySelector(".page-form-head")?.offsetHeight || 0;
+                        formScroll.style.maxHeight = `${Math.max(120, frameH - headH)}px`;
+                        formScroll.style.height = "";
+                    }
+                },
+
+                syncAllPagePairHeights() {
+                    for (const doc of this.allImgs) {
+                        this.syncPagePairHeights(doc.id);
+                    }
+                },
+
+                fitPagePreviewToWidth(docId, img) {
+                    const frame = document.querySelector(`[data-preview-frame="${docId}"]`);
+                    const preview = frame?.closest(".page-preview");
+                    if (!frame || !img || !img.naturalWidth) return;
+                    const width = preview?.clientWidth || frame.clientWidth;
+                    if (width <= 0) return;
+                    const height = Math.round(width * (img.naturalHeight / img.naturalWidth));
+                    frame.style.width = "100%";
+                    frame.style.height = `${Math.max(80, height)}px`;
+                },
+
+                refitAllPagePreviews() {
+                    for (const doc of this.allImgs) {
+                        if (this.canZoomDoc(doc)) {
+                            const img = this.getPageImageEl(doc.id);
+                            if (img?.naturalWidth) this.fitPagePreviewToWidth(doc.id, img);
+                            continue;
+                        }
+                        if (this.isPdfUrl(doc.url)) {
+                            const frame = document.querySelector(`[data-preview-frame="${doc.id}"]`);
+                            const preview = frame?.closest(".page-preview");
+                            if (frame && preview) {
+                                frame.style.width = "100%";
+                                frame.style.height = `${Math.max(320, Math.round(preview.clientWidth * 1.414))}px`;
+                            }
+                        }
+                    }
+                    this.$nextTick(() => this.syncAllPagePairHeights());
+                },
+
+                onPageImageLoad(docId, event) {
+                    const img = event?.target;
+                    if (!img) return;
+                    this.resetDocZoom(docId);
+                    this.fitPagePreviewToWidth(docId, img);
+                    this.$nextTick(() => this.syncPagePairHeights(docId));
+                },
+
+                onPagePreviewLoad(docId) {
+                    const frame = document.querySelector(`[data-preview-frame="${docId}"]`);
+                    const preview = frame?.closest(".page-preview");
+                    if (frame && preview) {
+                        frame.style.width = "100%";
+                        frame.style.height = `${Math.max(320, Math.round(preview.clientWidth * 1.414))}px`;
+                    }
+                    this.$nextTick(() => this.syncPagePairHeights(docId));
+                },
+
+                onPageFormWheel(event) {
+                    const el = event.currentTarget;
+                    const workspace = this.$refs.workspaceScroll;
+                    if (!el || !workspace) return;
+
+                    const deltaY = event.deltaY;
+                    if (!deltaY) return;
+
+                    const canScrollInside = el.scrollHeight > el.clientHeight + 1;
+                    const atTop = el.scrollTop <= 0;
+                    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+                    const workspaceMax = workspace.scrollHeight - workspace.clientHeight;
+
+                    let chainToWorkspace = false;
+                    if (!canScrollInside) {
+                        chainToWorkspace = true;
+                    } else if (deltaY < 0 && atTop) {
+                        chainToWorkspace = true;
+                    } else if (deltaY > 0 && atBottom) {
+                        chainToWorkspace = true;
+                    }
+
+                    if (!chainToWorkspace) return;
+
+                    event.preventDefault();
+                    workspace.scrollTop = Math.min(
+                        workspaceMax,
+                        Math.max(0, workspace.scrollTop + deltaY)
+                    );
+                },
+
+                grandTotalAmount() {
+                    let sum = 0;
+                    for (const doc of this.allImgs) {
+                        if (this.docLabelsMismatch(doc)) continue;
+                        for (const row of this.docItems[doc.id] || []) {
+                            if (!this.rowMatchesAmountFilter(row)) continue;
+                            const signed = this.signedAmount(row);
+                            if (signed !== null) sum += signed;
+                        }
+                    }
+                    return sum;
+                },
+
+                totalBadgeText() {
+                    return `合計 ${this.grandTotalAmount().toLocaleString("ja-JP")}`;
+                },
+
+                docLabel(doc) {
+                    const id = doc?.display_id != null ? `#${doc.display_id}` : "—";
+                    return id;
+                },
+
+                commonItemLabel(key) {
+                    const doc = this.allImgs[0];
+                    return this.itemColumnLabel(doc, key);
+                },
+
+                docLabelsMismatch(doc) {
+                    if (!this.allImgs.length || !doc) return false;
+                    const base = this.allImgs[0];
+                    if (doc.id === base.id) return false;
+                    for (const key of ["issued_on", "amount", "comment"]) {
+                        if (this.itemColumnLabel(doc, key) !== this.itemColumnLabel(base, key)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                },
+
+                getOutputLabel(output) {
+                    const raw = output?.label ?? output?.labels;
+                    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+                },
+
+                itemColumnLabel(doc, key) {
+                    const itemsLabel = this.getOutputLabel(doc?.output)?.items;
+                    const raw = itemsLabel && typeof itemsLabel === "object" ? itemsLabel[key] : "";
+                    if (typeof raw === "string" && raw.trim()) return raw.trim();
+                    return DEFAULT_ITEM_LABELS[key] || key;
+                },
+
+                getContent(output) {
+                    const c = output?.content;
+                    return c && typeof c === "object" && !Array.isArray(c) ? c : {};
+                },
+
+                getItems(output) {
+                    const items = this.getContent(output).items;
+                    return Array.isArray(items) ? items : [];
+                },
+
+                formatDate(v) {
+                    if (!v) return "";
+                    const m = String(v).trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                    if (!m) return "";
+                    return `${m[1]}/${m[2].padStart(2, "0")}/${m[3].padStart(2, "0")}`;
+                },
+
+                dateToInput(v) {
+                    const f = this.formatDate(v);
+                    if (!f) return "";
+                    const [y, m, d] = f.split("/");
+                    return `${y}-${m}-${d}`;
+                },
+
+                parseAmount(v) {
+                    if (v === "" || v == null) return null;
+                    const n = Number(String(v).replace(/,/g, "").trim());
+                    if (!Number.isFinite(n) || n < 0) return null;
+                    return n;
+                },
+
+                formatAmountInput(row) {
+                    if (!row?.amount) return row?.is_refund ? "-" : "";
+                    return row.is_refund ? `-${row.amount}` : String(row.amount);
+                },
+
+                syncAmountFromInput(row) {
+                    const raw = String(row.amountInput ?? "").trim();
+                    if (raw === "" || raw === "-") {
+                        row.amount = "";
+                        row.is_refund = false;
+                        return;
+                    }
+                    const isRefund = raw.startsWith("-");
+                    const numStr = isRefund ? raw.slice(1) : raw;
+                    const n = this.parseAmount(numStr);
+                    if (n === null) return;
+                    row.amount = String(n);
+                    row.is_refund = isRefund;
+                },
+
+                signedAmount(row) {
+                    const n = this.parseAmount(row?.amount);
+                    if (n === null) return null;
+                    return row.is_refund ? -n : n;
+                },
+
+                rowFromItem(item) {
+                    const amount = this.parseAmount(item?.amount);
+                    const isRefund = Number(item?.is_refund) === 1;
+                    const issued = this.formatDate(item?.issued_on);
+                    const row = {
+                        issued_on: issued,
+                        dateInput: this.dateToInput(issued),
+                        amount: amount !== null ? String(amount) : "",
+                        comment: item?.comment ?? "",
+                        is_refund: isRefund,
+                        amountInput: ""
+                    };
+                    row.amountInput = this.formatAmountInput(row);
+                    return row;
+                },
+
+                rowToItem(row) {
+                    const amount = this.parseAmount(row.amount);
+                    return {
+                        issued_on: this.formatDate(row.issued_on || row.dateInput) || "",
+                        amount: amount !== null ? amount : "",
+                        is_refund: row.is_refund ? 1 : 0,
+                        comment: row.comment ?? ""
+                    };
+                },
+
+                rowHasDate(row) {
+                    return Boolean(this.formatDate(row?.issued_on || row?.dateInput));
+                },
+
+                rowHasAmount(row) {
+                    return this.parseAmount(row?.amount) !== null;
+                },
+
+                canSaveDocs() {
+                    const docs = this.allImgs.filter((doc) => doc.is_done !== true);
+                    if (!docs.length) return false;
+                    for (const doc of docs) {
+                        for (const row of this.docItems[doc.id] || []) {
+                            if (!this.rowHasDate(row) || !this.rowHasAmount(row)) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                },
+
+                isDocImmutable(doc) {
+                    return doc?.is_done === true;
+                },
+
+                hasImmutableDocs() {
+                    return this.allImgs.some((doc) => doc.is_done === true);
+                },
+
+                allDocsImmutable() {
+                    return this.allImgs.length > 0 && this.allImgs.every((doc) => doc.is_done === true);
+                },
+
+                emptyRow() {
+                    return { issued_on: "", dateInput: "", amount: "", amountInput: "", comment: "", is_refund: false };
+                },
+
+                initDocItems() {
+                    const next = {};
+                    for (const doc of this.allImgs) {
+                        const stored = this.getItems(doc.output);
+                        next[doc.id] = stored.length ? stored.map(it => this.rowFromItem(it)) : [];
+                    }
+                    this.docItems = next;
+                    this.rebuildAmountCellIndex();
+                },
+
+                docRows(docId) {
+                    return this.docItems[docId] || [];
+                },
+
+                onDateChange(docId, ri) {
+                    const doc = this.allImgs.find((d) => d.id === docId);
+                    if (this.isDocImmutable(doc)) return;
+                    const row = this.docItems[docId]?.[ri];
+                    if (!row) return;
+                    row.issued_on = this.formatDate(row.dateInput);
+                },
+
+                onAmountInput(docId, ri) {
+                    const doc = this.allImgs.find((d) => d.id === docId);
+                    if (this.isDocImmutable(doc)) return;
+                    const row = this.docItems[docId]?.[ri];
+                    if (!row) return;
+                    let raw = String(row.amountInput ?? "").replace(/,/g, "");
+                    const isNegative = raw.startsWith("-");
+                    const digits = raw.replace(/-/g, "").replace(/\D/g, "");
+                    row.amountInput = isNegative ? (digits === "" ? "-" : `-${digits}`) : digits;
+                    this.syncAmountFromInput(row);
+                },
+
+                onAmountBlur(docId, ri) {
+                    const doc = this.allImgs.find((d) => d.id === docId);
+                    if (this.isDocImmutable(doc)) return;
+                    const row = this.docItems[docId]?.[ri];
+                    if (!row) return;
+                    this.syncAmountFromInput(row);
+                    row.amountInput = this.formatAmountInput(row);
+                },
+
+                addRow(docId) {
+                    const doc = this.allImgs.find((d) => d.id === docId);
+                    if (this.isDocImmutable(doc)) return;
+                    if (!this.docItems[docId]) this.docItems[docId] = [];
+                    this.docItems[docId].push(this.emptyRow());
+                    this.rebuildAmountCellIndex();
+                },
+
+                removeRow(docId, ri) {
+                    const doc = this.allImgs.find((d) => d.id === docId);
+                    if (this.isDocImmutable(doc)) return;
+                    this.docItems[docId]?.splice(ri, 1);
+                    this.clearAmountSelection();
+                    this.rebuildAmountCellIndex();
+                },
+
+                cellKey(docId, ri) {
+                    return `${docId}:${ri}`;
+                },
+
+                rebuildAmountCellIndex() {
+                    const index = {};
+                    let n = 0;
+                    for (const doc of this.allImgs) {
+                        if (this.docLabelsMismatch(doc)) continue;
+                        for (let ri = 0; ri < (this.docItems[doc.id]?.length ?? 0); ri += 1) {
+                            const row = this.docItems[doc.id][ri];
+                            if (!this.rowMatchesAmountFilter(row)) continue;
+                            index[this.cellKey(doc.id, ri)] = n;
+                            n += 1;
+                        }
+                    }
+                    this.amountCellIndex = index;
+                },
+
+                clearAmountSelection() {
+                    this.amountRangeStart = null;
+                    this.amountRangeEnd = null;
+                    this.amountRangeLo = -1;
+                    this.amountRangeHi = -1;
+                    this.amountRangeSummary = "";
+                    this.amountHoverKey = "";
+                },
+
+                syncAmountRange(start, end) {
+                    this.amountRangeEnd = end;
+                    if (!start || !end) {
+                        this.amountRangeLo = -1;
+                        this.amountRangeHi = -1;
+                        this.amountRangeSummary = "";
+                        return;
+                    }
+                    const si = this.amountCellIndex[this.cellKey(start.docId, start.ri)];
+                    const ei = this.amountCellIndex[this.cellKey(end.docId, end.ri)];
+                    if (si == null || ei == null) {
+                        this.amountRangeLo = -1;
+                        this.amountRangeHi = -1;
+                        this.amountRangeSummary = "";
+                        return;
+                    }
+                    const lo = Math.min(si, ei);
+                    const hi = Math.max(si, ei);
+                    this.amountRangeLo = lo;
+                    this.amountRangeHi = hi;
+                    let sum = 0;
+                    for (const [key, idx] of Object.entries(this.amountCellIndex)) {
+                        if (idx < lo || idx > hi) continue;
+                        const sep = key.lastIndexOf(":");
+                        const docId = key.slice(0, sep);
+                        const ri = Number(key.slice(sep + 1));
+                        const signed = this.signedAmount(this.docItems[docId]?.[ri]);
+                        if (signed === null) continue;
+                        sum += signed;
+                    }
+                    this.amountRangeSummary = `合計 ${sum.toLocaleString("ja-JP")}`;
+                },
+
+                isAmountAnchor(docId, ri) {
+                    return this.amountRangeStart
+                        && this.amountRangeStart.docId === docId
+                        && this.amountRangeStart.ri === ri;
+                },
+
+                isAmountInRange(docId, ri) {
+                    if (this.amountRangeLo < 0) return false;
+                    const idx = this.amountCellIndex[this.cellKey(docId, ri)];
+                    if (idx == null) return false;
+                    if (this.isAmountAnchor(docId, ri)) return false;
+                    return idx >= this.amountRangeLo && idx <= this.amountRangeHi;
+                },
+
+                onFormPanelClick(event) {
+                    if (event.target.closest(".amount-cell")) return;
+                    this.clearAmountSelection();
+                },
+
+                onFormTableMouseLeave() {
+                    if (!this.amountRangeStart) return;
+                    this.syncAmountRange(this.amountRangeStart, this.amountRangeStart);
+                    this.amountHoverKey = "";
+                },
+
+                onAmountInputMouseDown(event) {
+                    if (!event.shiftKey) this.clearAmountSelection();
+                },
+
+                onAmountCellMouseEnter(docId, ri) {
+                    this.amountHoverKey = this.cellKey(docId, ri);
+                    if (this.amountRangeStart) {
+                        this.syncAmountRange(this.amountRangeStart, { docId, ri });
+                    }
+                },
+
+                onAmountCellMouseLeave(docId, ri) {
+                    if (this.amountHoverKey === this.cellKey(docId, ri)) {
+                        this.amountHoverKey = "";
+                    }
+                },
+
+                onAmountCellMouseDown(docId, ri, event) {
+                    if (event.target.tagName === "INPUT") return;
+                    event.preventDefault();
+                    const point = { docId, ri };
+                    this.amountRangeStart = point;
+                    this.syncAmountRange(point, point);
+                },
+
+                rowMatchesAmountFilter(row) {
+                    const q = String(this.amountFilter || "").trim();
+                    if (!q) return true;
+                    const signed = this.signedAmount(row);
+                    if (signed !== null && String(Math.abs(signed)).includes(q)) return true;
+                    if (signed !== null && String(signed).includes(q)) return true;
+                    return String(row.amountInput || "").includes(q);
+                },
+
+                rowVisible(docId, ri, row) {
+                    return this.rowMatchesAmountFilter(row);
+                },
+
+                findFirstAmountFilterMatch() {
+                    const q = String(this.amountFilter || "").trim();
+                    if (!q) return null;
+                    for (let di = 0; di < this.allImgs.length; di += 1) {
+                        const doc = this.allImgs[di];
+                        if (this.docLabelsMismatch(doc)) continue;
+                        const rows = this.docItems[doc.id] || [];
+                        for (let ri = 0; ri < rows.length; ri += 1) {
+                            if (this.rowMatchesAmountFilter(rows[ri])) {
+                                return { docIndex: di, rowIndex: ri };
+                            }
+                        }
+                    }
+                    return null;
+                },
+
+                scrollToFirstAmountFilterMatch() {
+                    const match = this.findFirstAmountFilterMatch();
+                    if (!match) return;
+                    const workspace = this.$refs.workspaceScroll;
+                    if (!workspace) return;
+
+                    const pagePair = workspace.querySelectorAll(".page-pair")[match.docIndex];
+                    if (!pagePair) return;
+
+                    const formScroll = pagePair.querySelector(".page-form-scroll");
+                    const row = pagePair.querySelector(`tr[data-row-index="${match.rowIndex}"]`);
+
+                    workspace.scrollTop = this.blockTopInScroll(workspace, pagePair) - 8;
+
+                    if (formScroll && row) {
+                        const rowTop = this.blockTopInScroll(formScroll, row);
+                        const max = formScroll.scrollHeight - formScroll.clientHeight;
+                        formScroll.scrollTop = Math.min(max, Math.max(0, Math.round(rowTop - 4)));
+                    }
+                },
+
+                blockTopInScroll(el, block) {
+                    return block.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+                },
+
+                buildPayload(docId) {
+                    const doc = this.allImgs.find(d => d.id === docId);
+                    const existing = this.getContent(doc?.output);
+                    return {
+                        content: {
+                            ...existing,
+                            items: (this.docItems[docId] || [])
+                                .map(r => this.rowToItem(r))
+                                .filter(r => r.issued_on || r.amount !== "" || r.comment)
+                        }
+                    };
+                },
+
+                exportRowFromItem(item) {
+                    const row = this.rowFromItem(item);
+                    const amount = this.parseAmount(row.amount);
+                    if (amount === null) {
+                        return { date: row.issued_on, deposit: "", withdraw: "", comment: row.comment };
+                    }
+                    if (row.is_refund) {
+                        return { date: row.issued_on, deposit: "", withdraw: String(amount), comment: row.comment };
+                    }
+                    return { date: row.issued_on, deposit: String(amount), withdraw: "", comment: row.comment };
+                },
+
+                exportRows() {
+                    const rows = [];
+                    for (const doc of this.allImgs) {
+                        const source = (this.docItems[doc.id] || [])
+                            .map(r => this.rowToItem(r))
+                            .filter(r => r.issued_on || r.amount !== "" || r.comment);
+                        const items = source.length ? source : this.getItems(doc.output);
+                        for (const item of items) {
+                            const ex = this.exportRowFromItem(item);
+                            rows.push({
+                                displayId: doc.display_id,
+                                date: ex.date,
+                                deposit: ex.deposit,
+                                withdraw: ex.withdraw,
+                                comment: ex.comment
+                            });
+                        }
+                    }
+                    return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                },
+
+                processExport() {
+                    const header = ["日付", "ご利用金額", "返金額", "摘要"];
+                    const rows = [header];
+                    this.exportRows().forEach(r => {
+                        rows.push([
+                            r.date || "",
+                            r.deposit || "",
+                            r.withdraw || "",
+                            r.comment || ""
+                        ]);
+                    });
+                    const csv = rows.map(cols => cols.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+                    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv;charset=utf-8" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `credit_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    this.toast("CSVを出力しました");
+                },
+
+                async apiJson(res) {
+                    const json = await res.json().catch(() => ({}));
+                    if (res.status === 401) {
+                        localStorage.removeItem(TOKEN_KEY);
+                        this.redirectLogin();
+                        throw new Error("unauthorized");
+                    }
+                    if (!res.ok || json.success === false) {
+                        throw new Error(json.errors?.[0]?.msg || "API error");
+                    }
+                    return json;
+                },
+
+                async fetchAll() {
+                    this.loading = true;
+                    this.loadError = "";
+                    try {
+                        this.taskName = await this.fetchTaskName();
+                        this.allImgs = await this.fetchImgs();
+                        this.previewSrcOverrideById = {};
+                        if (!this.allImgs.length) {
+                            this.loadError = "ドキュメントがありません";
+                            return;
+                        }
+                        this.initDocItems();
+                        this.docZoom = {};
+                        this.globalZoomScale = 1;
+                        this.$nextTick(() => {
+                            this.syncAllPagePairHeights();
+                        });
+                    } catch (e) {
+                        if (e.message !== "unauthorized") {
+                            this.loadError = e.message || "読み込みに失敗しました";
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async fetchTaskName() {
+                    const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/search`, {
+                        method: "POST",
+                        headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                        body: JSON.stringify({ page: 1, size: 1, task_id: this.taskId })
+                    });
+                    const json = await this.apiJson(res);
+                    return json.data?.items?.[0]?.name || "";
+                },
+
+                async fetchImgs() {
+                    const all = [];
+                    let page = 1;
+                    let hasNext = true;
+                    while (hasNext) {
+                        const res = await fetch(
+                            `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/search`,
+                            {
+                                method: "POST",
+                                headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                                body: JSON.stringify({ page, size: 50, sort: "display_id_asc" })
+                            }
+                        );
+                        const json = await this.apiJson(res);
+                        for (const g of json.data?.items || []) {
+                            for (const img of g.imgs || []) all.push(img);
+                        }
+                        hasNext = json.data?.has_next === true;
+                        page += 1;
+                    }
+                    return all.sort((a, b) => {
+                        const da = a.display_id ?? 0;
+                        const db = b.display_id ?? 0;
+                        if (da !== db) return da - db;
+                        return String(a.id).localeCompare(String(b.id));
+                    });
+                },
+
+                async saveAllDocs(markDone) {
+                    if (this.allDocsImmutable()) {
+                        this.toast("確定済みのページは編集できません");
+                        return;
+                    }
+                    if (!this.canSaveDocs()) {
+                        this.toast("日付・金額が未入力の行があります");
+                        return;
+                    }
+                    this.loading = true;
+                    try {
+                        let saved = 0;
+                        for (const doc of this.allImgs) {
+                            if (doc.is_done === true) continue;
+                            const res = await fetch(
+                                `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/imgs/${encodeURIComponent(doc.id)}`,
+                                {
+                                    method: "PATCH",
+                                    headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                                    body: JSON.stringify({
+                                        is_done: markDone,
+                                        output: this.buildPayload(doc.id)
+                                    })
+                                }
+                            );
+                            const json = await this.apiJson(res);
+                            const idx = this.allImgs.findIndex(d => d.id === doc.id);
+                            if (idx >= 0) {
+                                this.allImgs[idx] = markDone
+                                    ? { ...doc, ...(json.data || {}), is_done: true }
+                                    : { ...doc, ...(json.data || {}) };
+                            }
+                            saved += 1;
+                        }
+                        this.toast(markDone ? `${saved}件を保存しました` : `${saved}件を一時保存しました`);
+                        if (markDone) this.step = "export";
+                    } catch (e) {
+                        if (e.message !== "unauthorized") {
+                            this.toast(markDone ? "保存に失敗しました" : "一時保存に失敗しました");
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                saveDraft() {
+                    return this.saveAllDocs(false);
+                },
+
+                finishAll() {
+                    return this.saveAllDocs(true);
+                }
+            };
+        }
+    </script>
+</body>
+</html>

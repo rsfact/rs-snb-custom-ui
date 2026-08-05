@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通帳チェッカー</title>
+    <link rel="icon" href="https://raw.githubusercontent.com/rsfact/assets/main/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #1c92ff;
+            --color-accent: #ff8428;
+            --layout-max: min(1600px, 100%);
+        }
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        body { background: #fafafa; color: #333; transition: background 0.2s ease; }
+        body.balance-ok { background: #ecfdf5 !important; }
+        body.balance-ok header { background: #f0fdf4; border-color: #bbf7d0; }
+        body.balance-ok .preview-card,
+        body.balance-ok .form-panel { background: #f0fdf4; border-color: #bbf7d0; }
+        body.balance-ok .edit-nav-bar { background: transparent; }
+        .app { height: 100%; display: flex; flex-direction: column; }
+        .layout-shell { width: 100%; max-width: var(--layout-max); margin-left: auto; margin-right: auto; }
+        .main { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 0.75rem 1.25rem 0.5rem; }
+        .edit-workspace {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .edit-grid {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+            align-items: stretch;
+        }
+        @media (min-width: 1024px) {
+            .edit-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 1.5rem; }
+        }
+        .preview-card,
+        .form-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: 100%;
+            max-height: 100%;
+            overflow: hidden;
+        }
+        .edit-nav-bar {
+            flex-shrink: 0;
+            padding: 0.5rem 0 0.625rem;
+            margin-bottom: 0.25rem;
+        }
+        .preview-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            position: relative;
+            overscroll-behavior: contain;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+        }
+        @media (max-width: 1023px) {
+            .preview-card,
+            .form-panel { height: auto; max-height: none; }
+            .preview-scroll {
+                height: 44dvh;
+                max-height: 44dvh;
+                flex: 0 0 auto;
+            }
+            .form-panel { max-height: calc(100dvh - 44dvh - 8.5rem); }
+        }
+        .preview-scroll img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            touch-action: none;
+            user-select: none;
+        }
+        .preview-img--grab { cursor: grab; }
+        .preview-img--grabbing { cursor: grabbing; }
+        .preview-scroll iframe {
+            display: block;
+            width: 100%;
+            min-height: 480px;
+            border: 0;
+            border-radius: 0.5rem;
+        }
+        .form-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            padding-right: 0.75rem;
+        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 9999px; }
+        [x-cloak] { display: none !important; }
+        .cell-muted { background: #f3f4f6; color: #9ca3af; }
+        .cell-muted input { background: transparent; color: #9ca3af; cursor: pointer; }
+        .cell-muted input:focus { background: #fff; color: #333; }
+        .amount-input { -moz-appearance: textfield; appearance: textfield; }
+        .amount-input::-webkit-outer-spin-button,
+        .amount-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .balance-formula {
+            border-radius: 0.875rem;
+            padding: 0.5rem 0 0.625rem;
+            margin-bottom: 0.625rem;
+            border: 1px solid transparent;
+            border-bottom: 1px solid #e5e7eb;
+            transition: background 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .balance-formula--ok { background: #ecfdf5; }
+        .balance-formula--idle { background: #f9fafb; }
+        .balance-formula__row-host {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .balance-formula__row {
+            display: inline-flex;
+            flex-wrap: nowrap;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 0.5rem 0.625rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 1rem;
+            line-height: 1.4;
+            padding-bottom: 0.125rem;
+        }
+        .balance-formula__cell {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.375rem;
+            flex: 0 0 auto;
+            min-width: 5.75rem;
+        }
+        .balance-formula__cell--balance { min-width: 8.5rem; }
+        .balance-formula__label {
+            font-family: ui-sans-serif, system-ui, sans-serif;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-align: center;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+        .balance-formula__op {
+            color: #6b7280;
+            font-weight: 700;
+            font-size: 1.125rem;
+            padding-top: 0.625rem;
+            user-select: none;
+            flex: 0 0 auto;
+        }
+        .balance-formula__sum {
+            flex: 0 0 auto;
+            min-width: 6rem;
+            padding: 0.5rem 0.625rem;
+            text-align: right;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #374151;
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 0.5rem;
+            border: 1px dashed #d1d5db;
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+        .formula-balance-input {
+            width: 8.5rem;
+            min-width: 8.5rem;
+            flex: 0 0 auto;
+            padding: 0.5rem 0.625rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            text-align: right;
+            background: #fff;
+            color: #111827;
+        }
+        .formula-balance-input:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
+        }
+        .balance-formula__title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 0.375rem;
+            width: 100%;
+        }
+        .balance-formula__title p {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: #4b5563;
+        }
+        .balance-formula__check {
+            color: #059669;
+            font-size: 1rem;
+            line-height: 1;
+        }
+        .data-table th,
+        .data-table td { font-size: 0.8125rem; }
+        .data-table th { font-size: 0.75rem; letter-spacing: 0.02em; }
+        .data-table input[type="date"],
+        .data-table input[type="text"] {
+            font-size: 0.8125rem;
+            padding: 0.375rem 0.5rem;
+        }
+        .data-table { table-layout: fixed; }
+        .data-table .col-date { width: 9rem; }
+        .data-table .col-amount { width: 5.85rem; }
+        .data-table .col-comment { width: auto; }
+        .data-table .col-action { width: 3rem; }
+        .export-table { table-layout: fixed; width: min(100%, 36rem); max-width: 36rem; margin-left: auto; margin-right: auto; }
+        .export-table th,
+        .export-table td { padding: 0.375rem 0.5rem; }
+        .export-table .export-col-date { width: 6.75rem; }
+        .export-table .export-col-amount { width: 5rem; }
+        .export-table .export-col-comment { width: auto; }
+        .toast-container {
+            position: fixed;
+            top: 0.75rem;
+            right: 0.75rem;
+            z-index: 50;
+            pointer-events: none;
+            max-width: 14rem;
+        }
+        .toast-item {
+            padding: 0.375rem 0.625rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+            font-size: 0.6875rem;
+            line-height: 1.25;
+            font-weight: 500;
+            background: #111827;
+            color: #fff;
+        }
+    </style>
+</head>
+<body
+    class="font-sans antialiased app"
+    x-data="appCtrl()"
+    x-init="init()"
+    :class="appBackgroundClass()"
+>
+
+    <header class="bg-white shadow-sm border-b border-gray-100 shrink-0 z-40">
+        <div class="layout-shell px-4 md:px-6 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+            <div class="flex items-center gap-2 min-w-0">
+                <i class="fa-solid fa-book text-lg text-sky-500"></i>
+                <span class="font-bold tracking-tight text-sm truncate">通帳チェッカー</span>
+            </div>
+            <div class="justify-self-center flex items-center justify-center gap-2 min-h-[2.5rem] flex-wrap px-2">
+                <div
+                    x-show="isCurrentImgFailed()"
+                    class="inline-flex items-center gap-2 flex-wrap justify-center"
+                    x-cloak
+                >
+                    <div class="inline-flex items-center px-4 py-2 rounded-xl border border-red-700 bg-red-600 text-white text-sm font-bold whitespace-nowrap">
+                        読み取りエラーのページです
+                    </div>
+                </div>
+            </div>
+            <div class="justify-self-end flex items-center gap-3 text-sm text-gray-600">
+                <div class="flex items-center gap-1 max-w-[12rem] truncate" :title="taskName">
+                    <span x-text="taskName || 'タスク'"></span>
+                    <i class="fa-solid fa-folder-open text-xs text-gray-400 shrink-0"></i>
+                </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition"
+                    @click="logout"
+                >
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>ログアウト</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main layout-shell w-full">
+        <div x-show="loading" class="fixed inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity" x-cloak>
+            <div class="text-center space-y-2">
+                <div class="animate-spin rounded-full h-10 w-10 border-4 border-t-transparent mx-auto" style="border-color: #38bdf8; border-top-color: transparent;"></div>
+                <div class="text-xs text-gray-500 font-medium">読み込み中...</div>
+            </div>
+        </div>
+
+        <div x-show="loadError" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-center" x-cloak>
+            <p x-text="loadError"></p>
+        </div>
+
+        <!-- 編集 -->
+        <div class="edit-workspace" x-show="step === 'edit' && currentImg()" x-cloak>
+            <div class="edit-grid">
+            <div class="preview-card bg-white rounded-2xl shadow-sm border border-gray-100 p-4 min-h-0">
+                <div
+                    class="preview-scroll custom-scroll flex items-center justify-center relative"
+                    :class="isCurrentImgFailed() ? 'bg-red-50/40 ring-2 ring-red-200' : 'bg-gray-50'"
+                    x-ref="previewScroll"
+                    @wheel="handlePreviewAreaWheel($event)"
+                >
+                    <span
+                        x-show="currentDisplayId() != null && !isPreviewLoading"
+                        class="absolute top-3 right-3 z-20 inline-flex items-center px-2.5 py-1 rounded-md border border-indigo-200 bg-indigo-50/95 text-indigo-700 text-sm font-bold shadow-sm pointer-events-none"
+                        x-text="currentDisplayLabel()"
+                        x-cloak
+                    ></span>
+                    <div x-show="isPreviewLoading" class="absolute inset-0 z-10 bg-white/75 backdrop-blur-[1px] flex items-center justify-center" x-cloak>
+                        <div class="animate-spin rounded-full h-9 w-9 border-4 border-t-transparent" style="border-color: #38bdf8; border-top-color: transparent;"></div>
+                    </div>
+                    <img
+                        x-show="currentPreviewSrc() && !isPdfUrl(currentImg()?.url)"
+                        x-ref="previewImage"
+                        :src="currentPreviewSrc()"
+                        alt="scan"
+                        draggable="false"
+                        class="preview-img w-full h-full object-contain"
+                        :class="imagePanCursorClass()"
+                        :style="imageZoomStyle()"
+                        @load="onPreviewImageLoad()"
+                        @error="onPreviewMediaError($event)"
+                        @wheel="handleImageZoomWheel($event)"
+                        @pointerdown="onImagePointerDown($event)"
+                        @pointermove="onImagePointerMove($event)"
+                        @pointerup="onImagePointerUp($event)"
+                        @pointercancel="onImagePointerUp($event)"
+                    >
+                    <iframe
+                        x-show="currentPreviewSrc() && isPdfUrl(currentImg()?.url)"
+                        :src="currentPreviewSrc()"
+                        title="preview"
+                        class="w-full h-full rounded-lg border-0"
+                        @load="handlePreviewLoaded()"
+                    ></iframe>
+                    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none" x-show="!isPreviewLoading" x-cloak>
+                        <div class="text-sm font-mono text-gray-700 whitespace-nowrap bg-white/90 border border-gray-200 rounded-lg px-3 py-1 shadow-sm">
+                            <span class="font-bold text-gray-900" x-text="navPos()"></span>
+                            <span class="text-gray-300 mx-1">/</span>
+                            <span x-text="navTotal()"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-panel bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+                <div class="form-scroll custom-scroll">
+                    <p
+                        x-show="isCurrentImmutable()"
+                        class="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3"
+                        x-cloak
+                    >
+                        チェック済のドキュメントは変更できません
+                    </p>
+                    <div
+                        class="balance-formula"
+                        :class="balanceFormulaValid() ? 'balance-formula--ok' : 'balance-formula--idle'"
+                    >
+                        <div class="balance-formula__title">
+                            <p>残高チェック</p>
+                            <i
+                                x-show="balanceFormulaValid()"
+                                class="fa-solid fa-circle-check balance-formula__check"
+                                aria-hidden="true"
+                                x-cloak
+                            ></i>
+                        </div>
+                        <div class="balance-formula__row-host custom-scroll">
+                        <div class="balance-formula__row">
+                            <div class="balance-formula__cell balance-formula__cell--balance">
+                                <input
+                                    type="text"
+                                    inputmode="numeric"
+                                    x-model="initBalance"
+                                    @input="onBalanceInput('initBalance')"
+                                    :disabled="isCurrentImmutable()"
+                                    class="formula-balance-input amount-input"
+                                    :title="scalarFieldLabel('init_balance')"
+                                >
+                                <span class="balance-formula__label" x-text="scalarFieldLabel('init_balance')"></span>
+                            </div>
+                            <span class="balance-formula__op">−</span>
+                            <div class="balance-formula__cell">
+                                <span class="balance-formula__sum" x-text="formatAmountDisplay(totalsFromItems().paymentTotal)"></span>
+                                <span class="balance-formula__label">支払合計額</span>
+                            </div>
+                            <span class="balance-formula__op">+</span>
+                            <div class="balance-formula__cell">
+                                <span class="balance-formula__sum" x-text="formatAmountDisplay(totalsFromItems().depositTotal)"></span>
+                                <span class="balance-formula__label">預入合計</span>
+                            </div>
+                            <span class="balance-formula__op">=</span>
+                            <div class="balance-formula__cell balance-formula__cell--balance">
+                                <input
+                                    type="text"
+                                    inputmode="numeric"
+                                    x-model="lastBalance"
+                                    @input="onBalanceInput('lastBalance')"
+                                    :disabled="isCurrentImmutable()"
+                                    class="formula-balance-input amount-input"
+                                    :title="scalarFieldLabel('last_balance')"
+                                >
+                                <span class="balance-formula__label" x-text="scalarFieldLabel('last_balance')"></span>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <table class="data-table w-full border-collapse">
+                        <colgroup>
+                            <col class="col-date">
+                            <col class="col-amount">
+                            <col class="col-amount">
+                            <col class="col-comment">
+                            <col class="col-action">
+                        </colgroup>
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600">
+                                <th class="p-2.5 text-left font-semibold" x-text="itemColumnLabel('issued_on')"></th>
+                                <th class="p-2.5 text-left font-semibold">支払金額</th>
+                                <th class="p-2.5 text-left font-semibold">預入金額</th>
+                                <th class="p-2.5 text-left font-semibold" x-text="itemColumnLabel('comment')"></th>
+                                <th class="p-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, ri) in items" :key="ri">
+                                <tr class="border-t border-gray-100 hover:bg-gray-50/60">
+                                    <td class="p-1.5">
+                                        <input type="date" x-model="row.dateInput" @change="onDateChange(ri)"
+                                            :disabled="isCurrentImmutable()"
+                                            class="w-full border border-gray-200 rounded-lg focus:outline-none focus:border-sky-400 disabled:bg-gray-50 disabled:text-gray-500">
+                                    </td>
+                                    <td class="p-1.5" :class="rowSideClass(row, 'credit')" @click="focusAmountSide(ri, 'credit')">
+                                        <input type="text" inputmode="numeric" x-model="row.credit"
+                                            @focus="activateAmountSide(ri, 'credit')"
+                                            @input="onCreditInput(ri)"
+                                            :disabled="isCurrentImmutable()"
+                                            placeholder="—"
+                                            class="amount-input w-full border border-gray-200 rounded-lg text-right font-mono focus:outline-none focus:border-sky-400 disabled:bg-gray-50 disabled:text-gray-500">
+                                    </td>
+                                    <td class="p-1.5" :class="rowSideClass(row, 'debit')" @click="focusAmountSide(ri, 'debit')">
+                                        <input type="text" inputmode="numeric" x-model="row.debit"
+                                            @focus="activateAmountSide(ri, 'debit')"
+                                            @input="onDebitInput(ri)"
+                                            :disabled="isCurrentImmutable()"
+                                            placeholder="—"
+                                            class="amount-input w-full border border-gray-200 rounded-lg text-right font-mono focus:outline-none focus:border-sky-400 disabled:bg-gray-50 disabled:text-gray-500">
+                                    </td>
+                                    <td class="p-1.5">
+                                        <input type="text" x-model="row.comment"
+                                            :disabled="isCurrentImmutable()"
+                                            class="w-full border border-gray-200 rounded-lg focus:outline-none focus:border-sky-400 disabled:bg-gray-50 disabled:text-gray-500">
+                                    </td>
+                                    <td class="p-1.5 text-center align-middle">
+                                        <button type="button" @click="removeRow(ri)"
+                                            x-show="!isCurrentImmutable()"
+                                            class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition shrink-0"
+                                            title="行削除">
+                                            <i class="fa-solid fa-xmark text-sm"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <button type="button" x-show="!isCurrentImmutable()" @click="addRow()" class="mt-3 text-sm text-sky-600 hover:text-sky-800 font-medium">
+                        <i class="fa-solid fa-plus mr-1"></i>行を追加
+                    </button>
+                </div>
+            </div>
+            </div>
+
+            <div class="edit-nav-bar flex items-center justify-center gap-2">
+                <button
+                    type="button"
+                    @click="prevImg()"
+                    :disabled="isPrevDisabled()"
+                    class="bg-emerald-100 hover:bg-emerald-200 disabled:opacity-40 disabled:hover:bg-emerald-100 text-emerald-800 py-2 px-5 rounded-xl font-medium text-sm transition shadow-sm min-w-[128px] whitespace-nowrap flex items-center justify-center"
+                >
+                    前へ
+                </button>
+                <button
+                    type="button"
+                    @click="saveAndNext()"
+                    class="bg-[#1c92ff] hover:bg-blue-600 text-white py-2 px-5 rounded-xl font-medium text-sm transition shadow-sm flex items-center justify-center gap-1.5 min-w-[140px] whitespace-nowrap"
+                >
+                    <span>次へ</span>
+                    <span class="text-[9px] opacity-80 font-normal bg-white/20 px-1 py-0.5 rounded shrink-0">Shift + Enter</span>
+                </button>
+                <button
+                    type="button"
+                    @click="goExport()"
+                    class="bg-[#ff8428] hover:bg-orange-600 text-white py-2 px-6 rounded-xl font-medium text-sm transition shadow-sm min-w-[80px] whitespace-nowrap text-center"
+                >
+                    完了
+                </button>
+            </div>
+        </div>
+
+        <!-- エクスポート -->
+        <div x-show="step === 'export'" class="flex-1 min-h-0 overflow-y-auto space-y-4" x-cloak>
+            <button @click="returnEdit()" class="text-sm text-gray-500 hover:text-gray-700">
+                <i class="fa-solid fa-arrow-left mr-1"></i>編集に戻る
+            </button>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div class="flex justify-center">
+                    <button @click="processExport()"
+                        class="px-8 py-3 rounded-2xl bg-[var(--color-primary)] text-white font-bold text-sm shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i>弥生会計用 CSV
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                <table class="export-table w-full text-xs">
+                    <colgroup>
+                        <col class="export-col-date">
+                        <col class="export-col-amount">
+                        <col class="export-col-amount">
+                        <col class="export-col-comment">
+                    </colgroup>
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                            <th class="text-left">取引日付</th>
+                            <th class="text-left">支払金額</th>
+                            <th class="text-left">預入金額</th>
+                            <th class="text-left">摘要</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="(row, i) in exportRows()" :key="i">
+                            <tr class="border-b border-gray-50 hover:bg-sky-50/50 cursor-pointer" @click="goEditFromExport(row.imgIndex)">
+                                <td class="font-mono" x-text="row.date"></td>
+                                <td class="font-mono text-right" :class="row.credit ? '' : 'text-gray-300'" x-text="row.credit || '—'"></td>
+                                <td class="font-mono text-right" :class="row.debit ? '' : 'text-gray-300'" x-text="row.debit || '—'"></td>
+                                <td class="text-gray-600 truncate" x-text="row.comment"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="toast-container space-y-1.5">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="toast-item" x-text="t.msg"></div>
+        </template>
+    </div>
+
+    <script>
+        const TOKEN_KEY = "snb_customer_token";
+        const params = new URLSearchParams(window.location.search);
+
+        const DEFAULT_SCALAR_LABELS = {
+            init_balance: "先頭の残高",
+            last_balance: "末尾の残高"
+        };
+
+        const DEFAULT_ITEM_LABELS = {
+            issued_on: "取引日付",
+            amount: "金額",
+            is_deposit: "入金/出金",
+            comment: "摘要"
+        };
+
+        function appCtrl() {
+            return {
+                baseUrl: new URL("/snb/api", window.location.origin).toString(),
+                boardId: "",
+                taskId: "",
+                token: "",
+                loading: false,
+                loadError: "",
+                taskName: "",
+                step: "edit",
+                allImgs: [],
+                pendingImgs: [],
+                currentIndex: 0,
+                exportImgIndex: null,
+                items: [],
+                initBalance: "",
+                lastBalance: "",
+                toasts: [],
+                imageZoomScale: 1,
+                imageZoomOrigin: { x: 50, y: 50 },
+                imagePanX: 0,
+                imagePanY: 0,
+                imageDragging: false,
+                imageDragStart: null,
+                zoomStep: 0.07,
+                panSensitivity: 0.55,
+                isPreviewLoading: false,
+                lastPreviewUrl: "",
+                previewSrcOverride: "",
+
+                init() {
+                    this.boardId = params.get("board_id") || "";
+                    this.taskId = params.get("task_id") || "";
+                    this.token = localStorage.getItem(TOKEN_KEY) || "";
+                    if (!this.boardId || !this.taskId) { this.loadError = "board_id / task_id が必要です"; return; }
+                    if (!this.token) { this.redirectLogin(); return; }
+                    this.fetchAll();
+                    window.addEventListener("keydown", (e) => {
+                        if (this.step !== "edit" || this.loading) return;
+                        if (e.shiftKey && e.key === "Enter") {
+                            e.preventDefault();
+                            this.saveAndNext();
+                        }
+                    });
+                },
+
+                appBackgroundClass() {
+                    if (this.step !== "edit" || !this.balanceFormulaValid()) return "";
+                    return "balance-ok";
+                },
+
+                getOutputLabel(output) {
+                    const raw = output?.label ?? output?.labels;
+                    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+                },
+
+                scalarFieldLabel(key) {
+                    const labels = this.getOutputLabel(this.currentImg()?.output);
+                    const raw = labels[key];
+                    if (typeof raw === "string" && raw.trim()) return raw.trim();
+                    return DEFAULT_SCALAR_LABELS[key] || key;
+                },
+
+                itemColumnLabel(key) {
+                    const itemsLabel = this.getOutputLabel(this.currentImg()?.output)?.items;
+                    const raw = itemsLabel && typeof itemsLabel === "object" ? itemsLabel[key] : "";
+                    if (typeof raw === "string" && raw.trim()) return raw.trim();
+                    return DEFAULT_ITEM_LABELS[key] || key;
+                },
+
+                formatAmountDisplay(value) {
+                    if (value === null || value === undefined || value === "") return "—";
+                    const n = Number(value);
+                    if (!Number.isFinite(n)) return String(value);
+                    return n.toLocaleString("ja-JP");
+                },
+
+                totalsFromItems() {
+                    let paymentTotal = 0;
+                    let depositTotal = 0;
+                    for (const row of this.items) {
+                        const credit = this.parseAmount(row.credit);
+                        const debit = this.parseAmount(row.debit);
+                        if (credit !== null) paymentTotal += credit;
+                        if (debit !== null) depositTotal += debit;
+                    }
+                    return { paymentTotal, depositTotal };
+                },
+
+                balanceComputedLast() {
+                    const init = this.parseAmount(this.initBalance);
+                    if (init === null) return null;
+                    const { paymentTotal, depositTotal } = this.totalsFromItems();
+                    return init - paymentTotal + depositTotal;
+                },
+
+                balanceFormulaValid() {
+                    const last = this.parseAmount(this.lastBalance);
+                    const computed = this.balanceComputedLast();
+                    if (last === null || computed === null) return false;
+                    return Math.abs(computed - last) < 0.01;
+                },
+
+                onBalanceInput(field) {
+                    if (this.isCurrentImmutable()) return;
+                    const raw = String(this[field] ?? "");
+                    if (raw === "") return;
+                    const n = this.parseAmount(raw);
+                    if (n === null) {
+                        this[field] = raw.replace(/[^\d]/g, "");
+                        return;
+                    }
+                    this[field] = String(n);
+                },
+
+                currentDisplayId() {
+                    const img = this.currentImg();
+                    return img?.display_id ?? null;
+                },
+
+                currentDisplayLabel() {
+                    const id = this.currentDisplayId();
+                    return id != null ? `# ${id}` : "";
+                },
+
+                isPrevDisabled() {
+                    return this.navPos() <= 1;
+                },
+
+                toast(msg) {
+                    const id = Date.now();
+                    this.toasts.push({ id, msg });
+                    setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 2500);
+                },
+
+                redirectLogin() {
+                    const u = new URL("./login.html", location.href);
+                    u.searchParams.set("board_id", this.boardId);
+                    u.searchParams.set("task_id", this.taskId);
+                    location.href = u.toString();
+                },
+
+                logout() {
+                    localStorage.removeItem(TOKEN_KEY);
+                    this.redirectLogin();
+                },
+
+                isPdfUrl(url) {
+                    return String(url || "").split("?")[0].toLowerCase().endsWith(".pdf");
+                },
+
+                imgContentUrl(img) {
+                    const board = String(this.boardId || "").trim();
+                    const task = String(this.taskId || "").trim();
+                    const imgId = String(img?.id || "").trim();
+                    if (!board || !task || !imgId) return "";
+                    return `${this.baseUrl}/v1/boards/${encodeURIComponent(board)}/tasks/${encodeURIComponent(task)}/imgs/${encodeURIComponent(imgId)}/content`;
+                },
+
+                currentPreviewSrc() {
+                    if (this.previewSrcOverride) return this.previewSrcOverride;
+                    const img = this.currentImg();
+                    return this.imgContentUrl(img) || String(img?.url || "").trim();
+                },
+
+                onPreviewMediaError(event) {
+                    this.handlePreviewLoaded();
+                    const fallback = String(this.currentImg()?.url || "").trim();
+                    const el = event?.target;
+                    if (!fallback || !el) return;
+                    if (el.src === fallback || this.previewSrcOverride === fallback) return;
+                    this.previewSrcOverride = fallback;
+                },
+
+                canZoomCurrentImage() {
+                    const url = this.currentImg()?.url || "";
+                    return Boolean(url) && !this.isPdfUrl(url);
+                },
+
+                resetImageZoom() {
+                    this.imageZoomScale = 1;
+                    this.imageZoomOrigin = { x: 50, y: 50 };
+                    this.imagePanX = 0;
+                    this.imagePanY = 0;
+                    this.imageDragging = false;
+                    this.imageDragStart = null;
+                },
+
+                applyImageTransform() {
+                    const img = this.$refs.previewImage;
+                    if (!img) return;
+                    const o = this.imageZoomOrigin;
+                    img.style.transform = `translate(${this.imagePanX}px, ${this.imagePanY}px) scale(${this.imageZoomScale}); transform-origin: ${o.x}% ${o.y}%`;
+                },
+
+                clampImagePan() {
+                    const img = this.$refs.previewImage;
+                    const container = this.$refs.previewScroll;
+                    if (!img || !container) return;
+
+                    if (this.imageZoomScale <= 1) {
+                        this.imagePanX = 0;
+                        this.imagePanY = 0;
+                        this.imageZoomOrigin = { x: 50, y: 50 };
+                        this.applyImageTransform();
+                        return;
+                    }
+
+                    this.applyImageTransform();
+
+                    const eps = 0.5;
+                    const c = container.getBoundingClientRect();
+                    const i = img.getBoundingClientRect();
+                    if (c.width <= 0 || c.height <= 0) return;
+
+                    let dx = 0;
+                    let dy = 0;
+
+                    if (i.width <= c.width + eps) {
+                        dx = (c.left + c.width / 2) - (i.left + i.width / 2);
+                    } else if (i.left > c.left + eps) {
+                        dx = c.left - i.left;
+                    } else if (i.right < c.right - eps) {
+                        dx = c.right - i.right;
+                    }
+
+                    if (i.height <= c.height + eps) {
+                        dy = (c.top + c.height / 2) - (i.top + i.height / 2);
+                    } else if (i.top > c.top + eps) {
+                        dy = c.top - i.top;
+                    } else if (i.bottom < c.bottom - eps) {
+                        dy = c.bottom - i.bottom;
+                    }
+
+                    if (Math.abs(dx) > 0.01) this.imagePanX += dx;
+                    if (Math.abs(dy) > 0.01) this.imagePanY += dy;
+
+                    this.applyImageTransform();
+                },
+
+                afterImageZoom() {
+                    if (this.imageZoomScale <= 1) {
+                        this.imagePanX = 0;
+                        this.imagePanY = 0;
+                        this.imageZoomOrigin = { x: 50, y: 50 };
+                        this.applyImageTransform();
+                        return;
+                    }
+                    this.clampImagePan();
+                },
+
+                imagePanCursorClass() {
+                    if (!this.canZoomCurrentImage()) return "";
+                    if (this.imageDragging) return "preview-img--grabbing";
+                    return "preview-img--grab";
+                },
+
+                imageZoomStyle() {
+                    const o = this.imageZoomOrigin;
+                    return `transform: translate(${this.imagePanX}px, ${this.imagePanY}px) scale(${this.imageZoomScale}); transform-origin: ${o.x}% ${o.y}%`;
+                },
+
+                onImagePointerDown(event) {
+                    if (!this.canZoomCurrentImage()) return;
+                    if (event.button !== 0) return;
+                    event.preventDefault();
+                    this.imageDragging = true;
+                    this.imageDragStart = {
+                        clientX: event.clientX,
+                        clientY: event.clientY,
+                        panX: this.imagePanX,
+                        panY: this.imagePanY
+                    };
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                },
+
+                onImagePointerMove(event) {
+                    if (!this.imageDragging || !this.imageDragStart) return;
+                    if (this.imageZoomScale <= 1) return;
+                    event.preventDefault();
+                    this.imagePanX = this.imageDragStart.panX
+                        + (event.clientX - this.imageDragStart.clientX) * this.panSensitivity;
+                    this.imagePanY = this.imageDragStart.panY
+                        + (event.clientY - this.imageDragStart.clientY) * this.panSensitivity;
+                    this.clampImagePan();
+                },
+
+                onImagePointerUp(event) {
+                    if (!this.imageDragging) return;
+                    this.imageDragging = false;
+                    this.imageDragStart = null;
+                    this.clampImagePan();
+                    try {
+                        event.currentTarget.releasePointerCapture?.(event.pointerId);
+                    } catch (_) {}
+                },
+
+                zoomInImage(step = this.zoomStep) {
+                    this.imageZoomScale = Math.min(5, Number((this.imageZoomScale + step).toFixed(3)));
+                    this.afterImageZoom();
+                },
+
+                zoomOutImage(step = this.zoomStep) {
+                    this.imageZoomScale = Math.max(0.4, Number((this.imageZoomScale - step).toFixed(3)));
+                    this.afterImageZoom();
+                },
+
+                applyZoomWheel(event, targetEl) {
+                    if (!this.canZoomCurrentImage()) return;
+                    event.preventDefault();
+                    const rect = targetEl?.getBoundingClientRect?.();
+                    if (rect?.width > 0 && rect?.height > 0) {
+                        const x = ((event.clientX - rect.left) / rect.width) * 100;
+                        const y = ((event.clientY - rect.top) / rect.height) * 100;
+                        this.imageZoomOrigin = {
+                            x: Math.min(100, Math.max(0, x)),
+                            y: Math.min(100, Math.max(0, y))
+                        };
+                    }
+                    const step = Math.min(this.zoomStep, Math.abs(event.deltaY) * 0.0012 + 0.025);
+                    if (event.deltaY < 0) this.zoomInImage(step);
+                    else this.zoomOutImage(step);
+                },
+
+                handleImageZoomWheel(event) {
+                    this.applyZoomWheel(event, event.currentTarget);
+                },
+
+                handlePreviewAreaWheel(event) {
+                    const img = this.$refs.previewImage;
+                    if (!img) return;
+                    this.applyZoomWheel(event, img);
+                },
+
+                onPreviewImageLoad() {
+                    this.resetImageZoom();
+                    this.handlePreviewLoaded();
+                },
+
+                handlePreviewLoaded() {
+                    this.isPreviewLoading = false;
+                },
+
+                syncPreviewLoadingState() {
+                    if (!this.isPreviewLoading) return;
+                    if (!this.lastPreviewUrl || this.isPdfUrl(this.currentImg()?.url)) return;
+                    const imgEl = this.$refs.previewImage;
+                    if (imgEl?.complete) {
+                        this.handlePreviewLoaded();
+                    }
+                },
+
+                formatDate(v) {
+                    if (!v) return "";
+                    const m = String(v).trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                    if (!m) return "";
+                    return `${m[1]}/${m[2].padStart(2, "0")}/${m[3].padStart(2, "0")}`;
+                },
+
+                dateToInput(v) {
+                    const f = this.formatDate(v);
+                    if (!f) return "";
+                    const [y, m, d] = f.split("/");
+                    return `${y}-${m}-${d}`;
+                },
+
+                getContent(output) {
+                    const c = output?.content;
+                    return c && typeof c === "object" && !Array.isArray(c) ? c : {};
+                },
+
+                getItems(output) {
+                    const items = this.getContent(output).items;
+                    return Array.isArray(items) ? items : [];
+                },
+
+                parseAmount(v) {
+                    if (v === "" || v == null) return null;
+                    const n = Number(String(v).replace(/,/g, "").trim());
+                    if (!Number.isFinite(n) || n < 0) return null;
+                    return n;
+                },
+
+
+                rowFromItem(item) {
+                    const amount = this.parseAmount(item?.amount);
+                    const isDeposit = Number(item?.is_deposit) === 1;
+                    const issued = this.formatDate(item?.issued_on);
+                    return {
+                        issued_on: issued,
+                        dateInput: this.dateToInput(issued),
+                        debit: isDeposit && amount !== null ? String(amount) : "",
+                        credit: !isDeposit && amount !== null ? String(amount) : "",
+                        comment: item?.comment ?? ""
+                    };
+                },
+
+                rowToItem(row) {
+                    const debit = this.parseAmount(row.debit);
+                    const credit = this.parseAmount(row.credit);
+                    let amount = "";
+                    let isDeposit = 0;
+                    if (debit !== null) {
+                        amount = debit;
+                        isDeposit = 1;
+                    } else if (credit !== null) {
+                        amount = credit;
+                        isDeposit = 0;
+                    }
+                    return {
+                        issued_on: this.formatDate(row.issued_on || row.dateInput) || "",
+                        amount,
+                        is_deposit: isDeposit,
+                        comment: row.comment ?? ""
+                    };
+                },
+
+                rowSideClass(row, side) {
+                    const hasDebit = this.parseAmount(row.debit) !== null;
+                    const hasCredit = this.parseAmount(row.credit) !== null;
+                    if (side === "debit" && hasCredit && !hasDebit) return "cell-muted";
+                    if (side === "credit" && hasDebit && !hasCredit) return "cell-muted";
+                    return "";
+                },
+
+                activateAmountSide(ri, side) {
+                    const row = this.items[ri];
+                    if (side === "debit" && this.parseAmount(row.credit) !== null) {
+                        row.credit = "";
+                    }
+                    if (side === "credit" && this.parseAmount(row.debit) !== null) {
+                        row.debit = "";
+                    }
+                },
+
+                focusAmountSide(ri, side) {
+                    this.activateAmountSide(ri, side);
+                    this.$nextTick(() => {
+                        const row = this.$el?.querySelectorAll("tbody tr")?.[ri];
+                        const input = row?.querySelector(side === "credit" ? "td:nth-child(2) input" : "td:nth-child(3) input");
+                        input?.focus();
+                    });
+                },
+
+                onDateChange(ri) {
+                    this.items[ri].issued_on = this.formatDate(this.items[ri].dateInput);
+                },
+
+                onDebitInput(ri) {
+                    const row = this.items[ri];
+                    const n = this.parseAmount(row.debit);
+                    if (n === null && row.debit !== "" && row.debit != null) {
+                        row.debit = row.debit.replace(/[^\d]/g, "");
+                        return;
+                    }
+                    if (n !== null) {
+                        row.debit = String(n);
+                        row.credit = "";
+                    }
+                },
+
+                onCreditInput(ri) {
+                    const row = this.items[ri];
+                    const n = this.parseAmount(row.credit);
+                    if (n === null && row.credit !== "" && row.credit != null) {
+                        row.credit = row.credit.replace(/[^\d]/g, "");
+                        return;
+                    }
+                    if (n !== null) {
+                        row.credit = String(n);
+                        row.debit = "";
+                    }
+                },
+
+                addRow() {
+                    if (this.isCurrentImmutable()) return;
+                    this.items.push({ issued_on: "", dateInput: "", debit: "", credit: "", comment: "" });
+                },
+
+                removeRow(ri) {
+                    if (this.isCurrentImmutable()) return;
+                    this.items.splice(ri, 1);
+                },
+
+                emptyRow() {
+                    return { issued_on: "", dateInput: "", debit: "", credit: "", comment: "" };
+                },
+
+                syncForm() {
+                    const img = this.currentImg();
+                    if (!img) {
+                        this.items = [];
+                        this.initBalance = "";
+                        this.lastBalance = "";
+                        this.isPreviewLoading = false;
+                        this.lastPreviewUrl = "";
+                        this.previewSrcOverride = "";
+                        return;
+                    }
+                    this.resetImageZoom();
+                    this.previewSrcOverride = "";
+                    const nextUrl = this.currentPreviewSrc();
+                    const urlChanged = nextUrl !== this.lastPreviewUrl;
+                    this.lastPreviewUrl = nextUrl;
+                    if (!nextUrl) {
+                        this.isPreviewLoading = false;
+                    } else if (urlChanged) {
+                        this.isPreviewLoading = true;
+                    } else {
+                        this.isPreviewLoading = false;
+                    }
+                    const content = this.getContent(img.output);
+                    const stored = this.getItems(img.output);
+                    this.items = stored.length ? stored.map(it => this.rowFromItem(it)) : [this.emptyRow()];
+                    this.initBalance = content.init_balance != null && content.init_balance !== ""
+                        ? String(content.init_balance)
+                        : "";
+                    this.lastBalance = content.last_balance != null && content.last_balance !== ""
+                        ? String(content.last_balance)
+                        : "";
+                    this.$nextTick(() => this.syncPreviewLoadingState());
+                },
+
+                buildPayload() {
+                    const existing = this.getContent(this.currentImg()?.output);
+                    const initParsed = this.parseAmount(this.initBalance);
+                    const lastParsed = this.parseAmount(this.lastBalance);
+                    return {
+                        content: {
+                            ...existing,
+                            init_balance: initParsed !== null ? initParsed : (this.initBalance.trim() || ""),
+                            last_balance: lastParsed !== null ? lastParsed : (this.lastBalance.trim() || ""),
+                            items: this.items
+                                .map(r => this.rowToItem(r))
+                                .filter(r => r.issued_on || r.amount !== "" || r.comment)
+                        }
+                    };
+                },
+
+                currentImg() {
+                    if (this.exportImgIndex != null) {
+                        return this.allImgs[this.exportImgIndex] || null;
+                    }
+                    return this.pendingImgs[this.currentIndex] || null;
+                },
+
+                isCurrentImgFailed() {
+                    return this.step === "edit" && this.currentImg()?.is_failed === true;
+                },
+
+                isCurrentImmutable() {
+                    return this.currentImg()?.is_done === true;
+                },
+
+                advanceWithoutSave() {
+                    if (this.exportImgIndex != null) {
+                        const next = this.exportImgIndex + 1;
+                        if (next < this.allImgs.length) {
+                            this.exportImgIndex = next;
+                            this.syncForm();
+                        } else {
+                            this.goExport();
+                        }
+                        return;
+                    }
+                    if (this.pendingImgs.length > 1 && this.currentIndex < this.pendingImgs.length - 1) {
+                        this.currentIndex++;
+                        this.syncForm();
+                    } else {
+                        this.goExport();
+                    }
+                },
+
+                navPos() {
+                    if (this.exportImgIndex != null) return this.exportImgIndex + 1;
+                    return this.currentIndex + 1;
+                },
+
+                navTotal() {
+                    if (this.exportImgIndex != null) return this.allImgs.length;
+                    return this.pendingImgs.length || this.allImgs.length;
+                },
+
+                rebuildPending() {
+                    this.pendingImgs = this.allImgs.filter(img => img.is_done !== true);
+                    if (this.currentIndex >= this.pendingImgs.length) {
+                        this.currentIndex = Math.max(0, this.pendingImgs.length - 1);
+                    }
+                },
+
+                prevImg() {
+                    if (this.exportImgIndex != null) {
+                        if (this.exportImgIndex > 0) {
+                            this.exportImgIndex--;
+                            this.syncForm();
+                        }
+                        return;
+                    }
+                    if (this.currentIndex > 0) {
+                        this.currentIndex--;
+                        this.syncForm();
+                    }
+                },
+
+                goExport() {
+                    this.exportImgIndex = null;
+                    this.step = "export";
+                },
+
+                returnEdit() {
+                    if (!this.allImgs.length) {
+                        this.toast("ドキュメントがありません");
+                        return;
+                    }
+                    this.exportImgIndex = this.allImgs.length - 1;
+                    this.step = "edit";
+                    this.syncForm();
+                },
+
+                goEditFromExport(imgIndex) {
+                    this.exportImgIndex = imgIndex;
+                    this.step = "edit";
+                    this.syncForm();
+                },
+
+                exportRows() {
+                    const rows = [];
+                    this.allImgs.forEach((img, imgIndex) => {
+                        this.getItems(img.output).forEach(item => {
+                            const r = this.rowFromItem(item);
+                            rows.push({
+                                imgIndex,
+                                date: r.issued_on,
+                                debit: r.debit !== "" ? r.debit : "",
+                                credit: r.credit !== "" ? r.credit : "",
+                                comment: r.comment
+                            });
+                        });
+                    });
+                    return rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                },
+
+                processExport() {
+                    const header = ["日付", "入金", "出金", "摘要"];
+                    const rows = [header];
+                    this.exportRows().forEach(r => {
+                        rows.push([
+                            r.date || "",
+                            r.debit !== "" ? r.debit : "",
+                            r.credit !== "" ? r.credit : "",
+                            r.comment || ""
+                        ]);
+                    });
+                    const csv = rows.map(cols => cols.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+                    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv;charset=utf-8" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `tucho_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    this.toast("CSVを出力しました");
+                },
+
+                async apiJson(res) {
+                    const json = await res.json().catch(() => ({}));
+                    if (res.status === 401) {
+                        localStorage.removeItem(TOKEN_KEY);
+                        this.redirectLogin();
+                        throw new Error("unauthorized");
+                    }
+                    if (!res.ok || json.success === false) {
+                        throw new Error(json.errors?.[0]?.msg || "API error");
+                    }
+                    return json;
+                },
+
+                async fetchAll() {
+                    this.loading = true;
+                    this.loadError = "";
+                    try {
+                        this.taskName = await this.fetchTaskName();
+                        this.allImgs = await this.fetchImgs();
+                        if (!this.allImgs.length) {
+                            this.loadError = "ドキュメントがありません";
+                            return;
+                        }
+                        this.rebuildPending();
+                        if (!this.pendingImgs.length) {
+                            this.step = "export";
+                        } else {
+                            this.currentIndex = 0;
+                            this.syncForm();
+                        }
+                    } catch (e) {
+                        if (e.message !== "unauthorized") {
+                            this.loadError = e.message || "読み込みに失敗しました";
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async fetchTaskName() {
+                    const res = await fetch(`${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/search`, {
+                        method: "POST",
+                        headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                        body: JSON.stringify({ page: 1, size: 1, task_id: this.taskId })
+                    });
+                    const json = await this.apiJson(res);
+                    return json.data?.items?.[0]?.name || "";
+                },
+
+                async fetchImgs() {
+                    const all = [];
+                    let page = 1;
+                    let hasNext = true;
+                    while (hasNext) {
+                        const res = await fetch(
+                            `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/search`,
+                            {
+                                method: "POST",
+                                headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                                body: JSON.stringify({ page, size: 50, sort: "created_at_desc" })
+                            }
+                        );
+                        const json = await this.apiJson(res);
+                        for (const g of json.data?.items || []) {
+                            for (const img of g.imgs || []) all.push(img);
+                        }
+                        hasNext = json.data?.has_next === true;
+                        page += 1;
+                    }
+                    return all;
+                },
+
+                async saveAndNext() {
+                    const img = this.currentImg();
+                    if (!img) return;
+                    if (this.isCurrentImmutable()) {
+                        this.advanceWithoutSave();
+                        return;
+                    }
+                    this.loading = true;
+                    try {
+                        const payload = this.buildPayload();
+                        const res = await fetch(
+                            `${this.baseUrl}/v1/boards/${encodeURIComponent(this.boardId)}/tasks/${encodeURIComponent(this.taskId)}/imgs/${encodeURIComponent(img.id)}`,
+                            {
+                                method: "PATCH",
+                                headers: { accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${this.token}` },
+                                body: JSON.stringify({ is_done: true, output: payload })
+                            }
+                        );
+                        const json = await this.apiJson(res);
+                        const saved = { ...img, ...(json.data || {}), is_done: true };
+                        const idx = this.allImgs.findIndex(i => i.id === img.id);
+                        if (idx >= 0) this.allImgs[idx] = saved;
+
+                        if (this.exportImgIndex != null) {
+                            const next = this.exportImgIndex + 1;
+                            if (next < this.allImgs.length) {
+                                this.exportImgIndex = next;
+                                this.syncForm();
+                            } else {
+                                this.goExport();
+                            }
+                            this.toast("保存しました");
+                            return;
+                        }
+
+                        this.rebuildPending();
+                        this.toast("保存しました");
+                        if (this.pendingImgs.length) {
+                            this.currentIndex = Math.min(this.currentIndex, this.pendingImgs.length - 1);
+                            this.syncForm();
+                        } else {
+                            this.goExport();
+                        }
+                    } catch (e) {
+                        if (e.message !== "unauthorized") this.toast("保存に失敗しました");
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>

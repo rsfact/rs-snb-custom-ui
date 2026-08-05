@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sansan Clone</title>
+  <title>特命タスク.com - 名刺Viewer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%232563eb' d='M0 32v448c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H32C14.3 0 0 14.3 0 32zm80 96a80 80 0 1 1 0 160 80 80 0 1 1 0-160zm240 96c26.5 0 48 21.5 48 48v48H32v-48c0-26.5 21.5-48 48-48h240z'/%3E%3C/svg%3E" type="image/svg+xml" />
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -32,7 +32,7 @@
   <div class="w-full max-w-md rounded-2xl bg-transparent p-3 md:p-5">
     <div class="text-center mb-5">
       <i class="fa-solid fa-print text-[var(--color-primary)]"></i>
-      <h1 class="font-bold text-xl mt-1">Sansan Clone</h1>
+      <h1 class="font-bold text-xl mt-1">特命タスク.com - 名刺Viewer</h1>
       <p class="text-xs text-gray-500 mt-1">ようこそ</p>
     </div>
 
@@ -76,7 +76,7 @@
     const API_BASE = new URL(
       "/snb/api",
       location.protocol === "file:" || location.origin === "null"
-        ? "{BASE_URL}"
+        ? "https://p01-ynk002a.yoneoka.work"
         : location.origin
     ).toString().replace(/\/$/, "");
     const TOKEN_KEYS = ["snb_customer_token", "snb_token"];

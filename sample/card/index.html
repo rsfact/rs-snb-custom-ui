@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>名刺管理 | Sansan Clone</title>
+  <title>特命タスク.com - 名刺Viewer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%232563eb' d='M0 32v448c0 17.7 14.3 32 32 32h448c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H32C14.3 0 0 14.3 0 32zm80 96a80 80 0 1 1 0 160 80 80 0 1 1 0-160zm240 96c26.5 0 48 21.5 48 48v48H32v-48c0-26.5 21.5-48 48-48h240z'/%3E%3C/svg%3E" type="image/svg+xml" />
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --blue-600: #2563eb;
@@ -114,25 +115,46 @@
     .custom-scroll::-webkit-scrollbar { width: 6px; }
     .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 
-    /* 詳細モーダル: 狭い画面では項目を縦積み */
-    @media (max-width: 767px) {
-      .detail-fields-table tr {
-        display: block;
-        border-bottom: 1px solid #f1f5f9;
-      }
-      .detail-fields-table tr:last-child { border-bottom: 0; }
-      .detail-fields-table th,
-      .detail-fields-table td {
-        display: block;
-        width: 100%;
-      }
-      .detail-fields-table th {
-        padding: 0.625rem 0.75rem 0.125rem;
-        background: transparent;
-      }
-      .detail-fields-table td {
-        padding: 0 0.75rem 0.625rem;
-      }
+    /* 詳細モーダル: 項目行 */
+    .detail-field-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+    }
+    .detail-field-label {
+      flex-shrink: 0;
+      width: 4.75rem;
+    }
+    @media (min-width: 640px) {
+      .detail-field-label { width: 7rem; }
+    }
+
+    .detail-preview-stage {
+      touch-action: none;
+      position: relative;
+      overflow: hidden;
+    }
+    .detail-preview-img {
+      touch-action: none;
+      will-change: transform;
+    }
+    .detail-preview-img--grab {
+      cursor: grab;
+    }
+    .detail-preview-img--grabbing {
+      cursor: grabbing;
+    }
+
+    .detail-sheet-handle {
+      flex-shrink: 0;
+    }
+    .detail-sheet--dragging {
+      transition: none !important;
+    }
+
+    .detail-save-btn:disabled {
+      cursor: default;
     }
 
     .list-table-icon {
@@ -161,7 +183,7 @@
           <i class="fa-solid fa-id-card text-sm"></i>
         </div>
         <div class="min-w-0">
-          <p class="text-sm font-bold truncate">Sansan Clone</p>
+          <p class="text-sm font-bold truncate">特命タスク.com - 名刺Viewer</p>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -169,9 +191,9 @@
           <i class="fa-solid fa-user text-[10px] text-blue-500"></i>
           <span x-text="userName"></span>
         </span>
-        <button type="button" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50" @click="exportCsv()" :disabled="!docs.length">
-          <i class="fa-solid fa-file-csv text-amber-500"></i>
-          <span class="hidden sm:inline ml-1">CSV出力</span>
+        <button type="button" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50" @click="exportExcel()" :disabled="!docs.length">
+          <i class="fa-solid fa-file-excel text-emerald-600"></i>
+          <span class="hidden sm:inline ml-1">Excel出力</span>
         </button>
         <button type="button" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50" @click="logout()">
           <i class="fa-solid fa-right-from-bracket"></i>
@@ -478,13 +500,22 @@
   <!-- 詳細モーダル -->
   <div x-show="detailOpen" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" x-cloak>
     <div class="absolute inset-0 bg-slate-900/50" @click="closeDetail()"></div>
-    <div class="relative z-10 w-full sm:max-w-6xl max-h-[100dvh] sm:max-h-[92vh] card-surface rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden">
+    <div
+      class="detail-sheet relative z-10 w-full sm:max-w-6xl max-h-[100dvh] sm:max-h-[92vh] card-surface rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out"
+      :class="{ 'detail-sheet--dragging': detailSheetDragging }"
+      :style="detailSheetDragStyle()"
+      @touchstart="onDetailSheetTouchStart($event)"
+      @touchmove="onDetailSheetTouchMove($event)"
+      @touchend="onDetailSheetTouchEnd($event)"
+      @touchcancel="onDetailSheetTouchEnd($event)"
+    >
+      <div class="detail-sheet-handle sm:hidden w-10 h-1 rounded-full bg-slate-300/90 mx-auto mt-2 shrink-0" aria-hidden="true"></div>
       <div class="px-4 py-3 border-b bg-gradient-to-r from-blue-600 to-blue-500 text-white shrink-0">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
             <p class="font-semibold text-sm flex items-center gap-2">
               <i class="fa-solid fa-id-card text-xs opacity-90"></i>
-              <span>Sansan Clone</span>
+              <span>特命タスク.com - 名刺Viewer</span>
             </p>
           </div>
           <button type="button" class="w-8 h-8 rounded-lg hover:bg-white/20 shrink-0" @click="closeDetail()"><i class="fa-solid fa-xmark"></i></button>
@@ -499,55 +530,65 @@
           />
           <button
             type="button"
-            class="shrink-0 px-3 py-2 rounded-lg bg-white text-blue-700 text-xs font-bold hover:bg-blue-50 disabled:opacity-50 touch-manipulation"
-            :disabled="detailMemoSaving"
+            class="detail-save-btn shrink-0 px-3 py-2 rounded-lg text-xs font-bold touch-manipulation disabled:opacity-50"
+            :class="isMemoDirty() ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-white/40 text-white/80'"
+            :disabled="detailMemoSaving || !isMemoDirty()"
             @click="saveDetailMemo()"
             x-text="detailMemoSaving ? '保存中' : '保存'"
           ></button>
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-h-0">
-        <div class="rounded-xl bg-slate-100 min-h-[160px] sm:min-h-[240px] flex items-center justify-center overflow-hidden border border-slate-200/80 shrink-0">
+      <div x-ref="detailScrollBody" class="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-h-0">
+        <div class="detail-preview-stage rounded-xl bg-slate-100 min-h-[min(52vh,360px)] sm:min-h-[240px] flex items-center justify-center border border-slate-200/80 shrink-0">
           <template x-if="detailDoc && isPdf(detailDoc.url)">
-            <iframe :src="detailDoc.url" class="w-full h-[min(40vh,220px)] sm:h-[320px] border-0"></iframe>
+            <iframe :src="detailDoc.url" class="w-full h-[min(52vh,360px)] sm:h-[320px] border-0"></iframe>
           </template>
-          <img x-show="detailDoc && !isPdf(detailDoc.url)" :src="detailDoc?.url" class="max-h-[min(40vh,220px)] sm:max-h-[320px] w-full object-contain" alt="" />
+          <img
+            x-show="detailDoc && !isPdf(detailDoc.url)"
+            x-ref="detailPreviewImage"
+            :src="detailDoc?.url"
+            alt=""
+            draggable="false"
+            class="max-h-[min(50vh,340px)] sm:max-h-[320px] w-full object-contain select-none detail-preview-img"
+            :class="imagePanCursorClass()"
+            :style="imageZoomStyle()"
+            @wheel.prevent="handleImageZoomWheel($event)"
+            @pointerdown="onImagePointerDown($event)"
+            @pointermove="onImagePointerMove($event)"
+            @pointerup="onImagePointerUp($event)"
+            @pointercancel="onImagePointerUp($event)"
+            @touchstart="onImageTouchStart($event)"
+            @touchmove.prevent="onImageTouchMove($event)"
+            @touchend="onImageTouchEnd($event)"
+            @touchcancel="onImageTouchEnd($event)"
+          />
         </div>
         <div class="min-w-0">
-          <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table class="detail-fields-table w-full text-sm border-collapse min-w-0">
-              <tbody>
-                <template x-for="field in detailFields" :key="field.key">
-                  <tr class="border-b border-slate-100 last:border-0 md:hover:bg-slate-50/60 transition-colors">
-                    <th class="md:w-[32%] px-3 py-2.5 md:bg-slate-50/90 text-left align-middle font-medium text-slate-600">
-                      <span class="inline-flex items-center gap-2">
-                        <span class="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                          <i :class="field.icon" class="text-blue-600 text-xs"></i>
-                        </span>
-                        <span class="text-xs sm:text-sm" x-text="field.label"></span>
-                      </span>
-                    </th>
-                    <td class="px-2 py-1.5 md:py-2 align-middle">
-                      <div class="flex items-center gap-2 min-h-[44px]">
-                        <input
-                          type="text"
-                          class="flex-1 min-w-0 px-3 py-2.5 sm:py-2 rounded-lg border border-slate-200 bg-white text-base sm:text-sm text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                          :placeholder="field.label + 'を入力'"
-                          x-model="field.value"
-                        />
-                        <button
-                          type="button"
-                          class="shrink-0 px-3 py-2 rounded-lg btn-primary text-xs font-semibold touch-manipulation disabled:opacity-50"
-                          :disabled="field.saving"
-                          @click="saveDetailField(field)"
-                          x-text="field.saving ? '保存中' : '保存'"
-                        ></button>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
+            <template x-for="field in detailFields" :key="field.key">
+              <div class="detail-field-row">
+                <div class="detail-field-label flex items-center gap-1.5 min-w-0">
+                  <span class="hidden sm:flex w-7 h-7 rounded-lg bg-blue-50 items-center justify-center shrink-0">
+                    <i :class="field.icon" class="text-blue-600 text-xs"></i>
+                  </span>
+                  <span class="text-xs text-slate-600 font-medium leading-tight truncate" x-text="field.label"></span>
+                </div>
+                <input
+                  type="text"
+                  class="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  :placeholder="field.label"
+                  x-model="field.value"
+                />
+                <button
+                  type="button"
+                  class="detail-save-btn shrink-0 px-2.5 py-2 rounded-lg text-xs font-semibold touch-manipulation min-w-[3rem]"
+                  :class="isFieldDirty(field) ? 'btn-primary' : 'bg-slate-200 text-slate-400'"
+                  :disabled="field.saving || !isFieldDirty(field)"
+                  @click="saveDetailField(field)"
+                  x-text="field.saving ? '…' : '保存'"
+                ></button>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -662,20 +703,64 @@
       const NAME_KEYS = ["snb_customer_name", "snb_user_name"];
       const PAGE_SIZE = 30;
 
-      /** 名刺詳細の固定項目（表示順・ラベル・アイコン・読み取りキー） */
-      const DETAIL_FIELD_DEFS = [
-        { key: "name", label: "氏名", icon: "fa-solid fa-user", aliases: ["name", "full_name", "person_name", "氏名"] },
-        { key: "company_name", label: "会社名", icon: "fa-solid fa-building", aliases: ["company_name", "company", "organization", "会社名"] },
-        { key: "department", label: "部署", icon: "fa-solid fa-sitemap", aliases: ["department", "部署"] },
-        { key: "role", label: "役職", icon: "fa-solid fa-briefcase", aliases: ["role", "position", "役職"] },
-        { key: "tel", label: "電話番号", icon: "fa-solid fa-phone", aliases: ["tel", "phone", "電話番号"] },
-        { key: "email", label: "メール", icon: "fa-solid fa-envelope", aliases: ["email", "mail", "メールアドレス"] },
-        { key: "url", label: "URL", icon: "fa-solid fa-link", aliases: ["url", "URL", "website", "web"] },
-        { key: "post_code", label: "郵便番号", icon: "fa-solid fa-location-dot", aliases: ["post_code", "zip", "郵便番号"] },
-        { key: "address", label: "住所", icon: "fa-solid fa-map-location-dot", aliases: ["address", "住所"] },
-        { key: "ref_number", label: "参照番号", icon: "fa-solid fa-hashtag", aliases: ["ref_number"] },
-        { key: "remarks", label: "備考", icon: "fa-solid fa-note-sticky", aliases: ["remarks", "memo", "備考"] },
+      const CARD_FIELD_LABELS = {
+        name: "氏名",
+        company_name: "会社名",
+        department: "部署",
+        role: "肩書き",
+        email: "メールアドレス",
+        url: "URL",
+        tel: "電話番号",
+        address: "住所",
+        post_code: "郵便番号",
+        remarks: "備考",
+        ref_number: "参照番号",
+      };
+
+      const EDIT_FIELD_ICONS = {
+        name: "fa-solid fa-user",
+        company_name: "fa-solid fa-building",
+        department: "fa-solid fa-sitemap",
+        role: "fa-solid fa-briefcase",
+        email: "fa-solid fa-envelope",
+        tel: "fa-solid fa-phone",
+        post_code: "fa-solid fa-location-dot",
+        address: "fa-solid fa-map-location-dot",
+        url: "fa-solid fa-link",
+        ref_number: "fa-solid fa-hashtag",
+        remarks: "fa-solid fa-note-sticky",
+      };
+
+      function cardFieldDef(key) {
+        return { key, label: CARD_FIELD_LABELS[key], aliases: [key] };
+      }
+
+      /** 名刺項目の表示・編集・Excel 共通順 */
+      const CARD_FIELD_KEYS = [
+        "name",
+        "company_name",
+        "department",
+        "role",
+        "email",
+        "tel",
+        "post_code",
+        "address",
+        "url",
+        "ref_number",
+        "remarks",
       ];
+
+      /** Excel 列順（参照番号を1列目） */
+      const EXCEL_FIELD_DEFS = [
+        "ref_number",
+        ...CARD_FIELD_KEYS.filter((key) => key !== "ref_number"),
+      ].map(cardFieldDef);
+
+      /** 詳細編集可能項目 */
+      const EDIT_FIELD_DEFS = CARD_FIELD_KEYS.map((key) => ({
+        ...cardFieldDef(key),
+        icon: EDIT_FIELD_ICONS[key],
+      }));
 
       function pickOutputValue(content, aliases) {
         for (const key of aliases) {
@@ -710,7 +795,7 @@
         baseUrl: new URL(
           "/snb/api",
           location.protocol === "file:" || location.origin === "null"
-            ? "{BASE_URL}"
+            ? "https://p01-ynk002a.yoneoka.work"
             : location.origin
         ).toString().replace(/\/$/, ""),
         boardId: "",
@@ -737,6 +822,7 @@
         detailDoc: null,
         detailFields: [],
         detailMemo: "",
+        detailMemoOriginal: "",
         detailMemoSaving: false,
         uploadPickerOpen: false,
         uploadChoiceOpen: false,
@@ -748,6 +834,18 @@
         confirmAction: null,
         pendingUploadTarget: null,
         toasts: [],
+        imageZoomScale: 1,
+        imageZoomOrigin: { x: 50, y: 50 },
+        imagePanX: 0,
+        imagePanY: 0,
+        imageDragging: false,
+        imageDragStart: null,
+        imageTouchMode: null,
+        imagePinchStartDistance: null,
+        imagePinchStartScale: 1,
+        detailSheetDragY: 0,
+        detailSheetDragging: false,
+        detailSheetTouchStart: null,
 
         init() {
           this.boardId = params.get("board_id") || "";
@@ -830,16 +928,16 @@
         },
 
         async loadRule() {
-          const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/`);
+          const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/rule`);
           const d = json.data || {};
           this.ruleName = d.name || "名刺管理";
         },
 
         async loadFolders() {
-          const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/search`, {
+          const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/tasks/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ page: 1, size: 200, is_include_archived: false })
+            body: JSON.stringify({ page: 1, size: 200 })
           });
           this.folders = json.data?.items || [];
           if (this.selectedFolderId && !this.folders.some((f) => f.id === this.selectedFolderId)) {
@@ -859,13 +957,13 @@
         async searchDocs(targetPage = 1) {
           this.setLoading(true, "名刺を検索中...");
           try {
-            const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/tasks/search`, {
+            const taskId = encodeURIComponent(this.selectedFolderId || "~all");
+            const json = await this.apiJson(`/boards/${encodeURIComponent(this.boardId)}/tasks/${taskId}/search`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 page: targetPage,
                 size: PAGE_SIZE,
-                task_id: this.selectedFolderId || null,
                 keyword: this.keyword.trim() || "",
                 is_done: true,
                 sort: "created_at_desc"
@@ -1027,12 +1125,12 @@
 
         cardTitle(doc) {
           const c = this.getOutputContent(doc.output);
-          return c.name || c.full_name || c.person_name || c.氏名 || "（氏名なし）";
+          return c.name || "（氏名なし）";
         },
 
         cardSubtitle(doc) {
           const c = this.getOutputContent(doc.output);
-          return c.company || c.company_name || c.会社名 || c.organization || c.department || "";
+          return c.company_name || c.department || "";
         },
 
         formatDate(iso) {
@@ -1046,18 +1144,227 @@
           return String(url || "").split("?")[0].toLowerCase().endsWith(".pdf");
         },
 
+        canZoomDetailImage() {
+          if (!this.detailDoc?.url) return false;
+          return !this.isPdf(this.detailDoc.url);
+        },
+
+        isFieldDirty(field) {
+          return String(field?.value ?? "") !== String(field?.originalValue ?? "");
+        },
+
+        isMemoDirty() {
+          return String(this.detailMemo ?? "") !== String(this.detailMemoOriginal ?? "");
+        },
+
+        resetDetailSheetDrag() {
+          this.detailSheetDragY = 0;
+          this.detailSheetDragging = false;
+          this.detailSheetTouchStart = null;
+        },
+
+        detailSheetDragStyle() {
+          if (this.detailSheetDragY <= 0) return {};
+          return { transform: `translateY(${this.detailSheetDragY}px)` };
+        },
+
+        isDetailSheetSwipeTarget(event) {
+          const tag = String(event.target?.tagName || "").toUpperCase();
+          if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "IFRAME") return false;
+          if (event.target?.closest?.(".detail-preview-img")) return false;
+          return true;
+        },
+
+        onDetailSheetTouchStart(event) {
+          if (event.touches.length !== 1 || !this.isDetailSheetSwipeTarget(event)) return;
+          const scrollEl = this.$refs.detailScrollBody;
+          this.detailSheetTouchStart = {
+            y: event.touches[0].clientY,
+            scrollTop: scrollEl?.scrollTop || 0,
+          };
+          this.detailSheetDragging = false;
+        },
+
+        onDetailSheetTouchMove(event) {
+          if (!this.detailSheetTouchStart || event.touches.length !== 1) return;
+          const dy = event.touches[0].clientY - this.detailSheetTouchStart.y;
+          if (dy <= 0) return;
+          if (this.detailSheetTouchStart.scrollTop > 0) return;
+          if (dy > 6) {
+            this.detailSheetDragging = true;
+            this.detailSheetDragY = dy;
+          }
+        },
+
+        onDetailSheetTouchEnd() {
+          if (this.detailSheetDragY > 90) this.closeDetail();
+          this.resetDetailSheetDrag();
+        },
+
+        getTouchDistance(touches) {
+          const dx = touches[0].clientX - touches[1].clientX;
+          const dy = touches[0].clientY - touches[1].clientY;
+          return Math.hypot(dx, dy);
+        },
+
+        onImageTouchStart(event) {
+          if (!this.canZoomDetailImage()) return;
+          if (event.touches.length === 2) {
+            this.imageTouchMode = "pinch";
+            this.imagePinchStartDistance = this.getTouchDistance(event.touches);
+            this.imagePinchStartScale = this.imageZoomScale;
+            return;
+          }
+          if (event.touches.length === 1) {
+            this.imageTouchMode = "pan";
+            this.imageDragStart = {
+              clientX: event.touches[0].clientX,
+              clientY: event.touches[0].clientY,
+              panX: this.imagePanX,
+              panY: this.imagePanY,
+            };
+          }
+        },
+
+        onImageTouchMove(event) {
+          if (!this.canZoomDetailImage()) return;
+          if (this.imageTouchMode === "pinch" && event.touches.length === 2 && this.imagePinchStartDistance) {
+            const dist = this.getTouchDistance(event.touches);
+            const ratio = dist / this.imagePinchStartDistance;
+            this.imageZoomScale = Math.min(5, Math.max(0.4, Number((this.imagePinchStartScale * ratio).toFixed(2))));
+            return;
+          }
+          if (this.imageTouchMode === "pan" && event.touches.length === 1 && this.imageDragStart) {
+            this.imagePanX = this.imageDragStart.panX + (event.touches[0].clientX - this.imageDragStart.clientX);
+            this.imagePanY = this.imageDragStart.panY + (event.touches[0].clientY - this.imageDragStart.clientY);
+          }
+        },
+
+        onImageTouchEnd(event) {
+          if (event.touches.length >= 2) return;
+          if (event.touches.length === 1 && this.imageTouchMode === "pinch") {
+            this.imageTouchMode = "pan";
+            this.imagePinchStartDistance = null;
+            this.imageDragStart = {
+              clientX: event.touches[0].clientX,
+              clientY: event.touches[0].clientY,
+              panX: this.imagePanX,
+              panY: this.imagePanY,
+            };
+            return;
+          }
+          this.imageTouchMode = null;
+          this.imageDragStart = null;
+          this.imagePinchStartDistance = null;
+        },
+
+        resetImageZoom() {
+          this.imageZoomScale = 1;
+          this.imageZoomOrigin = { x: 50, y: 50 };
+          this.imagePanX = 0;
+          this.imagePanY = 0;
+          this.imageDragging = false;
+          this.imageDragStart = null;
+          this.imageTouchMode = null;
+          this.imagePinchStartDistance = null;
+          this.imagePinchStartScale = 1;
+        },
+
+        imageZoomStyle() {
+          const o = this.imageZoomOrigin;
+          return {
+            transform: `translate(${this.imagePanX}px, ${this.imagePanY}px) scale(${this.imageZoomScale})`,
+            transformOrigin: `${o.x}% ${o.y}%`,
+          };
+        },
+
+        imagePanCursorClass() {
+          if (!this.canZoomDetailImage()) return "";
+          if (this.imageDragging) return "detail-preview-img--grabbing";
+          return "detail-preview-img--grab";
+        },
+
+        onImagePointerDown(event) {
+          if (!this.canZoomDetailImage()) return;
+          if (event.pointerType === "touch") return;
+          if (event.button !== 0) return;
+          event.preventDefault();
+          this.imageDragging = true;
+          this.imageDragStart = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            panX: this.imagePanX,
+            panY: this.imagePanY,
+          };
+          event.currentTarget?.setPointerCapture?.(event.pointerId);
+        },
+
+        onImagePointerMove(event) {
+          if (event.pointerType === "touch") return;
+          if (!this.imageDragging || !this.imageDragStart) return;
+          event.preventDefault();
+          this.imagePanX = this.imageDragStart.panX + (event.clientX - this.imageDragStart.clientX);
+          this.imagePanY = this.imageDragStart.panY + (event.clientY - this.imageDragStart.clientY);
+        },
+
+        onImagePointerUp(event) {
+          if (event.pointerType === "touch") return;
+          if (!this.imageDragging) return;
+          this.imageDragging = false;
+          this.imageDragStart = null;
+          try {
+            event.currentTarget?.releasePointerCapture?.(event.pointerId);
+          } catch {
+            /* pointer already released */
+          }
+        },
+
+        zoomInImage() {
+          this.imageZoomScale = Math.min(5, Number((this.imageZoomScale + 0.2).toFixed(2)));
+        },
+
+        zoomOutImage() {
+          this.imageZoomScale = Math.max(0.4, Number((this.imageZoomScale - 0.2).toFixed(2)));
+        },
+
+        handleImageZoomWheel(event) {
+          if (!this.canZoomDetailImage()) return;
+          const target = this.$refs.detailPreviewImage || event.currentTarget;
+          const rect = target?.getBoundingClientRect?.();
+          if (rect && rect.width > 0 && rect.height > 0) {
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            this.imageZoomOrigin = {
+              x: Math.min(100, Math.max(0, x)),
+              y: Math.min(100, Math.max(0, y)),
+            };
+          }
+          if (event.deltaY < 0) {
+            this.zoomInImage();
+          } else {
+            this.zoomOutImage();
+          }
+        },
+
         openDetail(doc) {
+          this.resetImageZoom();
           this.detailDoc = doc;
           const content = this.getOutputContent(doc.output);
-          this.detailFields = DETAIL_FIELD_DEFS.map((def) => ({
-            key: def.key,
-            label: def.label,
-            icon: def.icon,
-            value: pickOutputValue(content, def.aliases),
-            saving: false,
-          }));
+          this.detailFields = EDIT_FIELD_DEFS.map((def) => {
+            const value = pickOutputValue(content, def.aliases);
+            return {
+              key: def.key,
+              label: def.label,
+              icon: def.icon,
+              value,
+              originalValue: value,
+              saving: false,
+            };
+          });
           this.detailMemo = doc.memo || "";
+          this.detailMemoOriginal = doc.memo || "";
           this.detailMemoSaving = false;
+          this.resetDetailSheetDrag();
           this.detailOpen = true;
         },
 
@@ -1066,7 +1373,10 @@
           this.detailDoc = null;
           this.detailFields = [];
           this.detailMemo = "";
+          this.detailMemoOriginal = "";
           this.detailMemoSaving = false;
+          this.resetImageZoom();
+          this.resetDetailSheetDrag();
         },
 
         buildOutput() {
@@ -1104,6 +1414,7 @@
               }
             );
             this.syncDetailDocLocally(output);
+            field.originalValue = field.value;
             this.toast("保存しました");
           } catch {
             this.toast("保存に失敗しました", "error");
@@ -1119,6 +1430,7 @@
             const memo = this.detailMemo.trim();
             await this.patchDoc(this.detailDoc, { memo: memo || null });
             this.detailDoc.memo = memo;
+            this.detailMemoOriginal = memo;
             const row = this.docs.find((d) => d.id === this.detailDoc.id);
             if (row) row.memo = memo;
             this.toast("メモを保存しました");
@@ -1304,34 +1616,27 @@
           }
         },
 
-        exportCsv() {
-          if (!this.docs.length) return;
+        exportExcel() {
+          if (!this.docs.length || typeof XLSX === "undefined") return;
           const columns = [
-            { header: "フォルダ名", pick: (img, c) => img.task_name || "" },
-            { header: "名前", pick: (_img, c) => c.name || c.full_name || c.person_name || c.氏名 || "" },
-            { header: "会社名", pick: (_img, c) => c.company_name || c.company || c.organization || c.会社名 || "" },
-            { header: "部署", pick: (_img, c) => c.department || c.部署 || "" },
-            { header: "役職", pick: (_img, c) => c.role || c.position || c.役職 || "" },
-            { header: "電話番号", pick: (_img, c) => c.tel || c.phone || c.電話番号 || "" },
-            { header: "メールアドレス", pick: (_img, c) => c.email || c.mail || c.メールアドレス || "" },
-            { header: "URL", pick: (_img, c) => c.url || c.URL || "" },
-            { header: "郵便番号", pick: (_img, c) => c.post_code || c.zip || c.郵便番号 || "" },
-            { header: "住所", pick: (_img, c) => c.address || c.住所 || "" },
-            { header: "備考", pick: (_img, c) => c.remarks || c.memo || c.備考 || "" },
-            { header: "名刺の画像リンク", pick: (img, _c) => img.url || "" },
+            ...EXCEL_FIELD_DEFS.map((def) => ({
+              header: def.label,
+              pick: (_img, c) => pickOutputValue(c, def.aliases),
+            })),
+            { header: "フォルダ名", pick: (img) => img.task_name || "" },
+            { header: "スキャンURL", pick: (img) => img.url || "" },
           ];
-          const csvEscape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-          const lines = [columns.map((col) => csvEscape(col.header)).join(",")];
-          this.docs.forEach((img) => {
-            const c = this.getOutputContent(img.output);
-            lines.push(columns.map((col) => csvEscape(col.pick(img, c))).join(","));
-          });
-          const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = `meishi_${this.boardId}_${Date.now()}.csv`;
-          a.click();
-          URL.revokeObjectURL(a.href);
+          const rows = [
+            columns.map((col) => col.header),
+            ...this.docs.map((img) => {
+              const c = this.getOutputContent(img.output);
+              return columns.map((col) => col.pick(img, c));
+            }),
+          ];
+          const ws = XLSX.utils.aoa_to_sheet(rows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "名刺");
+          XLSX.writeFile(wb, `meishi_${this.boardId}_${Date.now()}.xlsx`);
         }
       };
     }
